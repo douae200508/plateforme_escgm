@@ -2,48 +2,75 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
-        'name',
+        'nom',
+        'prenom',
         'email',
         'password',
+        'role',
+        'actif',
+        'groupe_id',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'actif' => 'boolean',
+    ];
+
+    // ---- Relations ----
+
+    // Stagiaire : appartient à un groupe
+    public function groupe()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->belongsTo(Groupe::class);
+    }
+
+    // Résultats de QCM obtenus par le stagiaire
+    public function resultats()
+    {
+        return $this->hasMany(Resultat::class);
+    }
+
+    // Messages envoyés / reçus
+    public function messagesEnvoyes()
+    {
+        return $this->hasMany(Message::class, 'expediteur_id');
+    }
+
+    public function messagesRecus()
+    {
+        return $this->hasMany(Message::class, 'destinataire_id');
+    }
+
+    // Signalements émis (formateur) / reçus (admin)
+    public function signalementsEmis()
+    {
+        return $this->hasMany(Signalement::class, 'expediteur_id');
+    }
+
+    public function signalementsRecus()
+    {
+        return $this->hasMany(Signalement::class, 'destinataire_id');
+    }
+
+    // Notifications reçues
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
     }
 }
