@@ -66,9 +66,9 @@ class QcmController extends Controller
             'questions' => 'sometimes|array',
             'questions.*.texte' => 'required_with:questions|string',
             'questions.*.points' => 'required_with:questions|numeric|min:0',
-            'questions.*.correct_index' => 'required_with:questions|integer|min:0',
-            'questions.*.choix' => 'required_with:questions|array|min:1',
-            'questions.*.choix.*' => 'string',
+            'questions.*.choix' => 'required_with:questions|array|min:2',
+            'questions.*.choix.*.libelle' => 'required_with:questions|string',
+            'questions.*.choix.*.correct' => 'sometimes|boolean',
         ]);
 
         $qcm->update(collect($data)->only(['titre', 'seuil_reussite', 'nombre_tentatives', 'afficher_correction'])->toArray());
@@ -87,10 +87,10 @@ class QcmController extends Controller
                     'ordre' => $index,
                 ]);
 
-                foreach ($q['choix'] as $cIndex => $libelle) {
+                foreach ($q['choix'] as $choix) {
                     $question->choix()->create([
-                        'libelle' => $libelle,
-                        'est_correct' => $cIndex === $q['correct_index'],
+                        'libelle' => $choix['libelle'],
+                        'est_correct' => $choix['correct'] ?? false,
                     ]);
                 }
             }
@@ -108,8 +108,9 @@ class QcmController extends Controller
     }
 
     // Traduit le modèle relationnel (questions -> choix avec est_correct)
-    // vers la forme simple attendue par le front (choix: string[] +
-    // correct_index), qui ne gère qu'une seule bonne réponse par question.
+    // vers la forme attendue par le front : chaque choix porte son propre
+    // indicateur "correct", ce qui permet 0, 1 ou plusieurs bonnes réponses
+    // par question (principe Google Forms).
     private function format(Qcm $qcm)
     {
         $qcm->load(['ressource.chapitre', 'questions.choix']);
@@ -126,8 +127,7 @@ class QcmController extends Controller
                 'id' => $q->id,
                 'texte' => $q->enonce,
                 'points' => $q->points,
-                'correct_index' => $q->choix->search(fn ($c) => $c->est_correct) ?: 0,
-                'choix' => $q->choix->pluck('libelle')->values(),
+                'choix' => $q->choix->map(fn ($c) => ['libelle' => $c->libelle, 'correct' => $c->est_correct])->values(),
             ])->values(),
         ];
     }

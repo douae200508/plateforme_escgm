@@ -5,7 +5,10 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { colors } from '../../theme'
 
 const TABS = ['Questions', 'Paramètres', 'Aperçu']
-const LETTERS = ['A', 'B', 'C', 'D']
+
+function letterFor(index) {
+  return String.fromCharCode(65 + index)
+}
 
 let nextQuestionId = 100
 
@@ -60,11 +63,27 @@ export default function GestionQCM() {
     updateQcm({ questions: qcm.questions.map((qu) => (qu.id === questionId ? { ...qu, ...patch } : qu)) })
   }
 
-  const updateChoix = (questionId, index, value) => {
+  const updateChoixLibelle = (questionId, index, value) => {
     const question = qcm.questions.find((qu) => qu.id === questionId)
-    const choix = [...question.choix]
-    choix[index] = value
+    const choix = question.choix.map((c, i) => (i === index ? { ...c, libelle: value } : c))
     updateQuestion(questionId, { choix })
+  }
+
+  const toggleChoixCorrect = (questionId, index) => {
+    const question = qcm.questions.find((qu) => qu.id === questionId)
+    const choix = question.choix.map((c, i) => (i === index ? { ...c, correct: !c.correct } : c))
+    updateQuestion(questionId, { choix })
+  }
+
+  const addChoix = (questionId) => {
+    const question = qcm.questions.find((qu) => qu.id === questionId)
+    updateQuestion(questionId, { choix: [...question.choix, { libelle: '', correct: false }] })
+  }
+
+  const removeChoix = (questionId, index) => {
+    const question = qcm.questions.find((qu) => qu.id === questionId)
+    if (question.choix.length <= 2) return
+    updateQuestion(questionId, { choix: question.choix.filter((_, i) => i !== index) })
   }
 
   const deleteQuestion = (questionId) => {
@@ -75,7 +94,12 @@ export default function GestionQCM() {
     updateQcm({
       questions: [
         ...qcm.questions,
-        { id: `new-${nextQuestionId++}`, texte: '', points: 5, correct_index: 0, choix: ['', '', '', ''] },
+        {
+          id: `new-${nextQuestionId++}`,
+          texte: '',
+          points: 5,
+          choix: [{ libelle: '', correct: false }, { libelle: '', correct: false }, { libelle: '', correct: false }, { libelle: '', correct: false }],
+        },
       ],
     })
   }
@@ -120,7 +144,7 @@ export default function GestionQCM() {
         seuil_reussite: qcm.seuil_reussite,
         nombre_tentatives: qcm.nombre_tentatives,
         afficher_correction: qcm.afficher_correction,
-        questions: qcm.questions.map((q) => ({ texte: q.texte, points: q.points, correct_index: q.correct_index, choix: q.choix })),
+        questions: qcm.questions.map((q) => ({ texte: q.texte, points: q.points, choix: q.choix.map((c) => ({ libelle: c.libelle, correct: c.correct })) })),
       })
       setQcm(data)
       setQcms((prev) => prev.map((q) => (q.id === data.id ? { ...q, titre: data.titre, chapitre: data.chapitre, questions_count: data.questions.length, total_points: data.questions.reduce((sum, qu) => sum + Number(qu.points || 0), 0) } : q)))
@@ -239,16 +263,17 @@ export default function GestionQCM() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {q.choix.map((choice, cIndex) => {
-                  const correct = q.correct_index === cIndex
+                  const correct = choice.correct
                   return (
                     <div key={cIndex} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <button
-                        onClick={() => updateQuestion(q.id, { correct_index: cIndex })}
-                        aria-label={`Définir ${LETTERS[cIndex]} comme bonne réponse`}
+                        type="button"
+                        onClick={() => toggleChoixCorrect(q.id, cIndex)}
+                        aria-label={`${correct ? 'Retirer' : 'Marquer'} ${letterFor(cIndex)} comme bonne réponse`}
                         style={{
                           width: 26,
                           height: 26,
-                          borderRadius: '50%',
+                          borderRadius: 6,
                           border: correct ? 'none' : `1.5px solid ${colors.border}`,
                           background: correct ? colors.success : colors.white,
                           color: correct ? colors.white : colors.textMuted,
@@ -258,12 +283,12 @@ export default function GestionQCM() {
                           flexShrink: 0,
                         }}
                       >
-                        {LETTERS[cIndex]}
+                        {letterFor(cIndex)}
                       </button>
                       <input
                         type="text"
-                        value={choice}
-                        onChange={(e) => updateChoix(q.id, cIndex, e.target.value)}
+                        value={choice.libelle}
+                        onChange={(e) => updateChoixLibelle(q.id, cIndex, e.target.value)}
                         style={{
                           ...inputStyle,
                           flex: 1,
@@ -272,13 +297,25 @@ export default function GestionQCM() {
                           color: correct ? '#15803D' : colors.text,
                         }}
                       />
+                      <button
+                        type="button"
+                        onClick={() => removeChoix(q.id, cIndex)}
+                        disabled={q.choix.length <= 2}
+                        aria-label="Supprimer cette proposition"
+                        style={{ border: 0, background: 'transparent', cursor: q.choix.length <= 2 ? 'not-allowed' : 'pointer', color: q.choix.length <= 2 ? colors.border : colors.danger, fontWeight: 800, flexShrink: 0 }}
+                      >
+                        ×
+                      </button>
                     </div>
                   )
                 })}
               </div>
-              <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.textMuted, fontStyle: 'italic' }}>
-                Cliquez sur une lettre pour définir la bonne réponse.
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                <button type="button" onClick={() => addChoix(q.id)} style={smallOutlineBtnStyle}>+ Ajouter une proposition</button>
+                <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontStyle: 'italic' }}>
+                  Cochez une ou plusieurs lettres pour définir les bonnes réponses.
+                </p>
+              </div>
             </div>
           ))}
 
@@ -356,9 +393,9 @@ export default function GestionQCM() {
                     }}
                   >
                     <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: colors.textMuted, flexShrink: 0 }}>
-                      {LETTERS[cIndex]}
+                      {letterFor(cIndex)}
                     </span>
-                    <span style={{ fontSize: 13.5 }}>{choice}</span>
+                    <span style={{ fontSize: 13.5 }}>{choice.libelle}</span>
                   </div>
                 ))}
               </div>
@@ -460,6 +497,19 @@ const smallDangerBtnStyle = {
   fontSize: 12.5,
   fontWeight: 700,
   cursor: 'pointer',
+}
+
+const smallOutlineBtnStyle = {
+  minHeight: 34,
+  padding: '0 12px',
+  borderRadius: 8,
+  fontSize: 12.5,
+  fontWeight: 700,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  background: colors.white,
+  color: colors.primary,
+  border: `1px solid ${colors.primary}`,
 }
 
 const linkBtnStyle = {
