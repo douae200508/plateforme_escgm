@@ -63,6 +63,9 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::delete('/groupes/{groupe}/stagiaires/{user}', [GroupeController::class, 'removeStagiaire']);
 
     Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::put('/users/{user}', [UserController::class, 'update']);
+    Route::delete('/users/{user}', [UserController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'role:formateur,admin'])->group(function () {
