@@ -1,5 +1,11 @@
-<?php 
+<?php
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Admin\FormationController;
+use App\Http\Controllers\Admin\ModuleController;
+use App\Http\Controllers\Admin\ChapitreController;
+use App\Http\Controllers\Admin\RessourceController;
+use App\Http\Controllers\Admin\ResultatController;
+use App\Http\Controllers\Admin\QcmController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -8,8 +14,41 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 });
-Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
-    // routes de gestion réservées à l'admin
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
+    Route::get('/formations', [FormationController::class, 'index']);
+    Route::post('/formations', [FormationController::class, 'store']);
+    Route::put('/formations/{formation}', [FormationController::class, 'update']);
+    Route::delete('/formations/{formation}', [FormationController::class, 'destroy']);
+
+    Route::get('/modules', [ModuleController::class, 'index']);
+    Route::post('/modules', [ModuleController::class, 'store']);
+    Route::put('/modules/{module}', [ModuleController::class, 'update']);
+    Route::delete('/modules/{module}', [ModuleController::class, 'destroy']);
+    Route::post('/modules/reorder', [ModuleController::class, 'reorder']);
+
+    Route::post('/chapitres', [ChapitreController::class, 'store']);
+    Route::get('/chapitres/{chapitre}', [ChapitreController::class, 'show']);
+    Route::put('/chapitres/{chapitre}', [ChapitreController::class, 'update']);
+    Route::delete('/chapitres/{chapitre}', [ChapitreController::class, 'destroy']);
+    Route::post('/chapitres/reorder', [ChapitreController::class, 'reorder']);
+    Route::post('/chapitres/{chapitre}/ressources', [ChapitreController::class, 'storeRessource']);
+    Route::put('/chapitres/{chapitre}/ressources/{ressource}', [ChapitreController::class, 'updateRessource']);
+    Route::delete('/chapitres/{chapitre}/ressources/{ressource}', [ChapitreController::class, 'destroyRessource']);
+
+    Route::get('/ressources', [RessourceController::class, 'index']);
+    Route::post('/ressources', [RessourceController::class, 'store']);
+    Route::put('/ressources/{ressource}', [RessourceController::class, 'update']);
+    Route::delete('/ressources/{ressource}', [RessourceController::class, 'destroy']);
+
+    Route::get('/resultats/stats', [ResultatController::class, 'stats']);
+
+    Route::get('/chapitres', [ChapitreController::class, 'index']);
+
+    Route::get('/qcms', [QcmController::class, 'index']);
+    Route::post('/qcms', [QcmController::class, 'store']);
+    Route::get('/qcms/{qcm}', [QcmController::class, 'show']);
+    Route::put('/qcms/{qcm}', [QcmController::class, 'update']);
+    Route::delete('/qcms/{qcm}', [QcmController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'role:formateur,admin'])->group(function () {
