@@ -6,6 +6,8 @@ use App\Http\Controllers\Admin\ChapitreController;
 use App\Http\Controllers\Admin\RessourceController;
 use App\Http\Controllers\Admin\ResultatController;
 use App\Http\Controllers\Admin\QcmController;
+use App\Http\Controllers\Admin\GroupeController;
+use App\Http\Controllers\Admin\UserController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -49,6 +51,18 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::get('/qcms/{qcm}', [QcmController::class, 'show']);
     Route::put('/qcms/{qcm}', [QcmController::class, 'update']);
     Route::delete('/qcms/{qcm}', [QcmController::class, 'destroy']);
+
+    Route::get('/groupes', [GroupeController::class, 'index']);
+    Route::post('/groupes', [GroupeController::class, 'store']);
+    Route::get('/groupes/{groupe}', [GroupeController::class, 'show']);
+    Route::put('/groupes/{groupe}', [GroupeController::class, 'update']);
+    Route::delete('/groupes/{groupe}', [GroupeController::class, 'destroy']);
+    Route::post('/groupes/{groupe}/formateurs', [GroupeController::class, 'assignFormateur']);
+    Route::delete('/groupes/{groupe}/formateurs/{user}', [GroupeController::class, 'removeFormateur']);
+    Route::post('/groupes/{groupe}/stagiaires', [GroupeController::class, 'assignStagiaire']);
+    Route::delete('/groupes/{groupe}/stagiaires/{user}', [GroupeController::class, 'removeStagiaire']);
+
+    Route::get('/users', [UserController::class, 'index']);
 });
 
 Route::middleware(['auth:sanctum', 'role:formateur,admin'])->group(function () {
