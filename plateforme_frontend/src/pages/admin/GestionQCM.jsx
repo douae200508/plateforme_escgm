@@ -1,54 +1,60 @@
-import { useState } from 'react'
-import { inputStyle } from '../../components/Modal'
+import { useEffect, useState } from 'react'
+import api from '../../api/axios'
+import Modal, { Field, inputStyle } from '../../components/Modal'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { colors } from '../../theme'
-
-// Pur front pour l'instant (pas encore de contrôleur QCM/Question/Choix
-// côté Laravel) — données d'exemple reprises de la maquette.
-const CHAPITRE_OPTIONS = ['Conditions et boucles', 'Structure HTML', 'Mise en forme CSS', 'Flexbox et mise en page']
-
-const MOCK_QCMS = [
-  {
-    id: 1,
-    titre: 'QCM – Mise en forme CSS',
-    chapitre: 'Conditions et boucles',
-    seuilReussite: 71,
-    tentatives: 2,
-    afficherCorrection: false,
-    questions: [
-      {
-        id: 1,
-        texte: 'Quelle propriété modifie la couleur du texte ?',
-        points: 5,
-        correctIndex: 1,
-        choix: ['background-color', 'color', 'font-color', 'text-style'],
-      },
-      {
-        id: 2,
-        texte: 'Quel sélecteur cible la classe « menu » ?',
-        points: 5,
-        correctIndex: 2,
-        choix: ['#menu', '.menu', 'menu', '*menu'],
-      },
-    ],
-  },
-]
 
 const TABS = ['Questions', 'Paramètres', 'Aperçu']
 const LETTERS = ['A', 'B', 'C', 'D']
 
 let nextQuestionId = 100
 
+function chapitreLabel(c) {
+  return `${c.formation_titre} · ${c.module_titre} · ${c.titre}`
+}
+
 export default function GestionQCM() {
-  const [qcms, setQcms] = useState(MOCK_QCMS)
-  const [qcmId, setQcmId] = useState(MOCK_QCMS[0].id)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [chapitres, setChapitres] = useState([])
+  const [qcms, setQcms] = useState([])
+  const [qcmId, setQcmId] = useState(null)
+  const [qcm, setQcm] = useState(null)
   const [tab, setTab] = useState('Questions')
   const [saved, setSaved] = useState(false)
+  const [newQcmModal, setNewQcmModal] = useState(false)
+  const [newQcmForm, setNewQcmForm] = useState({ titre: '', chapitre_id: '' })
+  const [toDelete, setToDelete] = useState(false)
 
-  const qcm = qcms.find((q) => q.id === qcmId)
-
-  const updateQcm = (patch) => {
-    setQcms((prev) => prev.map((q) => (q.id === qcmId ? { ...q, ...patch } : q)))
+  const loadQcmDetail = (id) => {
+    api
+      .get(`/admin/qcms/${id}`)
+      .then(({ data }) => setQcm(data))
+      .catch(() => setError('Impossible de charger ce QCM.'))
   }
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([api.get('/admin/chapitres'), api.get('/admin/qcms')])
+      .then(([chapitresRes, qcmsRes]) => {
+        setChapitres(chapitresRes.data)
+        setQcms(qcmsRes.data)
+        if (qcmsRes.data.length) {
+          setQcmId(qcmsRes.data[0].id)
+          loadQcmDetail(qcmsRes.data[0].id)
+        }
+      })
+      .catch(() => setError('Impossible de charger les QCM.'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const selectQcm = (id) => {
+    setQcmId(id)
+    setQcm(null)
+    loadQcmDetail(id)
+  }
+
+  const updateQcm = (patch) => setQcm((prev) => ({ ...prev, ...patch }))
 
   const updateQuestion = (questionId, patch) => {
     updateQcm({ questions: qcm.questions.map((qu) => (qu.id === questionId ? { ...qu, ...patch } : qu)) })
@@ -69,25 +75,83 @@ export default function GestionQCM() {
     updateQcm({
       questions: [
         ...qcm.questions,
-        { id: nextQuestionId++, texte: '', points: 5, correctIndex: 0, choix: ['', '', '', ''] },
+        { id: `new-${nextQuestionId++}`, texte: '', points: 5, correct_index: 0, choix: ['', '', '', ''] },
       ],
     })
   }
 
-  const addQcm = () => {
-    const id = nextQuestionId++
-    const next = { id, titre: 'Nouveau QCM', chapitre: CHAPITRE_OPTIONS[0], seuilReussite: 70, tentatives: 1, afficherCorrection: false, questions: [] }
-    setQcms((prev) => [...prev, next])
-    setQcmId(id)
-    setTab('Questions')
+  const openNewQcmModal = () => {
+    setNewQcmForm({ titre: '', chapitre_id: chapitres[0]?.id || '' })
+    setNewQcmModal(true)
+  }
+
+  const submitNewQcm = async () => {
+    try {
+      const { data } = await api.post('/admin/qcms', { titre: newQcmForm.titre, chapitre_id: newQcmForm.chapitre_id })
+      setQcms((prev) => [...prev, { id: data.id, titre: data.titre, chapitre: data.chapitre, questions_count: 0, total_points: 0 }])
+      setQcmId(data.id)
+      setQcm(data)
+      setTab('Questions')
+      setNewQcmModal(false)
+    } catch {
+      setError('La création du QCM a échoué.')
+    }
+  }
+
+  const confirmDeleteQcm = async () => {
+    await api.delete(`/admin/qcms/${qcmId}`)
+    const remaining = qcms.filter((q) => q.id !== qcmId)
+    setQcms(remaining)
+    setToDelete(false)
+    if (remaining.length) {
+      setQcmId(remaining[0].id)
+      loadQcmDetail(remaining[0].id)
+    } else {
+      setQcmId(null)
+      setQcm(null)
+    }
+  }
+
+  const save = async () => {
+    try {
+      const { data } = await api.put(`/admin/qcms/${qcmId}`, {
+        titre: qcm.titre,
+        chapitre_id: qcm.chapitre_id,
+        seuil_reussite: qcm.seuil_reussite,
+        nombre_tentatives: qcm.nombre_tentatives,
+        afficher_correction: qcm.afficher_correction,
+        questions: qcm.questions.map((q) => ({ texte: q.texte, points: q.points, correct_index: q.correct_index, choix: q.choix })),
+      })
+      setQcm(data)
+      setQcms((prev) => prev.map((q) => (q.id === data.id ? { ...q, titre: data.titre, chapitre: data.chapitre, questions_count: data.questions.length, total_points: data.questions.reduce((sum, qu) => sum + Number(qu.points || 0), 0) } : q)))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch {
+      setError("L'enregistrement a échoué.")
+    }
+  }
+
+  if (loading) {
+    return <p style={{ color: colors.textMuted, fontSize: 14 }}>Chargement…</p>
+  }
+
+  if (!qcm) {
+    return (
+      <div>
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Gestion des QCM</h1>
+        {error && <div style={{ margin: '12px 0', color: colors.danger, fontSize: 14 }}>{error}</div>}
+        <div style={{ marginTop: 20, background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 32, textAlign: 'center' }}>
+          <p style={{ margin: '0 0 14px', color: colors.textMuted, fontSize: 14 }}>Aucun QCM pour l'instant.</p>
+          <button onClick={openNewQcmModal} style={primaryBtnStyle}>+ Nouveau QCM</button>
+        </div>
+        {newQcmModal && (
+          <NewQcmModal chapitres={chapitres} form={newQcmForm} setForm={setNewQcmForm} onClose={() => setNewQcmModal(false)} onSubmit={submitNewQcm} />
+        )}
+      </div>
+    )
   }
 
   const totalPoints = qcm.questions.reduce((sum, q) => sum + Number(q.points || 0), 0)
-
-  const save = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
 
   return (
     <div>
@@ -102,21 +166,24 @@ export default function GestionQCM() {
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 700, color: colors.textMuted }}>
             QCM
-            <select value={qcmId} onChange={(e) => setQcmId(Number(e.target.value))} style={{ ...inputStyle, minWidth: 220, background: colors.white }}>
+            <select value={qcmId} onChange={(e) => selectQcm(Number(e.target.value))} style={{ ...inputStyle, minWidth: 220, background: colors.white }}>
               {qcms.map((q) => (
                 <option key={q.id} value={q.id}>{q.titre}</option>
               ))}
             </select>
           </label>
-          <button onClick={addQcm} style={outlineBtnStyle}>+ Nouveau QCM</button>
+          <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
           <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
         </div>
       </div>
 
+      {error && <div style={{ margin: '0 0 12px', color: colors.danger, fontSize: 14 }}>{error}</div>}
+
       <p style={{ margin: '0 0 18px', fontSize: 13.5 }}>
         <strong>{qcm.titre}</strong>
-        <span style={{ color: colors.primary, fontWeight: 600 }}> · {qcm.chapitre}</span>
+        {qcm.chapitre && <span style={{ color: colors.primary, fontWeight: 600 }}> · {qcm.chapitre.titre}</span>}
         <span style={{ color: colors.textMuted }}> · {qcm.questions.length} questions · total {totalPoints} points</span>
+        <button onClick={() => setToDelete(true)} style={{ ...linkBtnStyle, marginLeft: 10 }}>Supprimer ce QCM</button>
       </p>
 
       <div style={{ display: 'flex', gap: 22, borderBottom: `1px solid ${colors.border}`, marginBottom: 18 }}>
@@ -172,11 +239,11 @@ export default function GestionQCM() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {q.choix.map((choice, cIndex) => {
-                  const correct = q.correctIndex === cIndex
+                  const correct = q.correct_index === cIndex
                   return (
                     <div key={cIndex} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <button
-                        onClick={() => updateQuestion(q.id, { correctIndex: cIndex })}
+                        onClick={() => updateQuestion(q.id, { correct_index: cIndex })}
                         aria-label={`Définir ${LETTERS[cIndex]} comme bonne réponse`}
                         style={{
                           width: 26,
@@ -239,17 +306,17 @@ export default function GestionQCM() {
             <input type="text" value={qcm.titre} onChange={(e) => updateQcm({ titre: e.target.value })} style={inputStyle} />
           </Field>
           <Field label="Chapitre associé">
-            <select value={qcm.chapitre} onChange={(e) => updateQcm({ chapitre: e.target.value })} style={{ ...inputStyle, background: colors.white }}>
-              {CHAPITRE_OPTIONS.map((c) => (
-                <option key={c} value={c}>{c}</option>
+            <select value={qcm.chapitre_id || ''} onChange={(e) => updateQcm({ chapitre_id: Number(e.target.value) })} style={{ ...inputStyle, background: colors.white }}>
+              {chapitres.map((c) => (
+                <option key={c.id} value={c.id}>{chapitreLabel(c)}</option>
               ))}
             </select>
           </Field>
           <Field label="Seuil de réussite (%)">
-            <input type="number" min={0} max={100} value={qcm.seuilReussite} onChange={(e) => updateQcm({ seuilReussite: Number(e.target.value) })} style={inputStyle} />
+            <input type="number" min={0} max={100} value={qcm.seuil_reussite} onChange={(e) => updateQcm({ seuil_reussite: Number(e.target.value) })} style={inputStyle} />
           </Field>
           <Field label="Nombre de tentatives autorisées">
-            <input type="number" min={1} value={qcm.tentatives} onChange={(e) => updateQcm({ tentatives: Number(e.target.value) })} style={inputStyle} />
+            <input type="number" min={1} value={qcm.nombre_tentatives} onChange={(e) => updateQcm({ nombre_tentatives: Number(e.target.value) })} style={inputStyle} />
           </Field>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -257,7 +324,7 @@ export default function GestionQCM() {
               <div style={{ fontSize: 14, fontWeight: 700 }}>Afficher la correction aux stagiaires</div>
               <div style={{ fontSize: 12.5, color: colors.textMuted }}>Après validation du QCM</div>
             </div>
-            <Toggle checked={qcm.afficherCorrection} onChange={(v) => updateQcm({ afficherCorrection: v })} />
+            <Toggle checked={qcm.afficher_correction} onChange={(v) => updateQcm({ afficher_correction: v })} />
           </div>
         </div>
       )}
@@ -299,16 +366,38 @@ export default function GestionQCM() {
           ))}
         </div>
       )}
+
+      {newQcmModal && (
+        <NewQcmModal chapitres={chapitres} form={newQcmForm} setForm={setNewQcmForm} onClose={() => setNewQcmModal(false)} onSubmit={submitNewQcm} />
+      )}
+
+      {toDelete && (
+        <ConfirmDialog
+          title="Supprimer le QCM"
+          text={`« ${qcm.titre} » sera définitivement supprimé. Continuer ?`}
+          cta="Supprimer"
+          onCancel={() => setToDelete(false)}
+          onConfirm={confirmDeleteQcm}
+        />
+      )}
     </div>
   )
 }
 
-function Field({ label, children }) {
+function NewQcmModal({ chapitres, form, setForm, onClose, onSubmit }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 700 }}>
-      {label}
-      {children}
-    </label>
+    <Modal title="Nouveau QCM" onClose={onClose} onSubmit={onSubmit} submitLabel="Créer">
+      <Field label="Titre du QCM">
+        <input type="text" required autoFocus value={form.titre} onChange={(e) => setForm({ ...form, titre: e.target.value })} style={inputStyle} />
+      </Field>
+      <Field label="Chapitre associé">
+        <select value={form.chapitre_id} onChange={(e) => setForm({ ...form, chapitre_id: Number(e.target.value) })} style={{ ...inputStyle, background: colors.white }}>
+          {chapitres.map((c) => (
+            <option key={c.id} value={c.id}>{chapitreLabel(c)}</option>
+          ))}
+        </select>
+      </Field>
+    </Modal>
   )
 }
 
@@ -371,4 +460,14 @@ const smallDangerBtnStyle = {
   fontSize: 12.5,
   fontWeight: 700,
   cursor: 'pointer',
+}
+
+const linkBtnStyle = {
+  border: 0,
+  background: 'transparent',
+  color: colors.danger,
+  fontSize: 12.5,
+  fontWeight: 700,
+  cursor: 'pointer',
+  padding: 0,
 }
