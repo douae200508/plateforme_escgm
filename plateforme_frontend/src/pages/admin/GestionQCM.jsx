@@ -33,44 +33,114 @@ const SCRIPT_EXEMPLE = JSON.stringify(
   2,
 )
 
-// Valide et convertit le script JSON (question/choix/correctes) vers la
-// forme interne des questions — permet de générer tout un QCM en une
-// fois, comme un script Google Apps Script générant un formulaire.
+// Extrait "nom = [ ... ]" ou "nom = { ... }" d'un texte en comptant les
+// crochets/accolades (gère le code Apps Script, pas seulement du JSON).
+function extractBalanced(text, startIndex, open, close) {
+  let depth = 0
+  for (let i = startIndex; i < text.length; i++) {
+    const ch = text[i]
+    if (ch === open) depth++
+    else if (ch === close) {
+      depth--
+      if (depth === 0) return text.slice(startIndex, i + 1)
+    }
+  }
+  return null
+}
+
+function extractNamedLiteral(text, name, open, close) {
+  const re = new RegExp(`(?:var|let|const)\\s+${name}\\s*=\\s*(\\${open})`)
+  const match = re.exec(text)
+  if (!match) return null
+  const startIndex = match.index + match[0].length - 1
+  const literal = extractBalanced(text, startIndex, open, close)
+  if (!literal) return null
+  try {
+    // Le texte extrait est un littéral de données (chaînes/nombres/tableaux),
+    // jamais le script entier : aucun appel FormApp/GmailApp n'est exécuté.
+    return new Function(`"use strict"; return (${literal});`)()
+  } catch {
+    return null
+  }
+}
+
+function resolveCorrectIndexes(item, optionsLength, num) {
+  if (Array.isArray(item.correctes)) {
+    if (item.correctes.some((i) => !Number.isInteger(i) || i < 0 || i >= optionsLength)) {
+      throw new Error(`Question ${num} : "correctes" doit contenir des index valides.`)
+    }
+    return item.correctes
+  }
+  if (item.correct == null) return []
+
+  // Convention Apps Script : "correct" est une lettre (A, B, C…) ou un
+  // tableau de lettres pour plusieurs bonnes réponses.
+  const raw = Array.isArray(item.correct) ? item.correct : [item.correct]
+  return raw.map((l) => {
+    if (typeof l === 'number' && Number.isInteger(l)) return l
+    if (typeof l === 'string' && /^[A-Za-z]$/.test(l.trim())) {
+      return l.trim().toUpperCase().charCodeAt(0) - 65
+    }
+    throw new Error(`Question ${num} : "correct" doit être une lettre (A, B, C…) ou un index.`)
+  }).filter((i) => {
+    if (i < 0 || i >= optionsLength) throw new Error(`Question ${num} : réponse correcte hors limites.`)
+    return true
+  })
+}
+
+function normalizeQuestion(item, index) {
+  const num = index + 1
+  if (!item || typeof item !== 'object') throw new Error(`Question ${num} : format invalide.`)
+
+  const texte = item.question ?? item.texte
+  if (typeof texte !== 'string' || !texte.trim()) {
+    throw new Error(`Question ${num} : le champ "question" est obligatoire.`)
+  }
+
+  const options = item.options ?? item.choix
+  if (!Array.isArray(options) || options.length < 2) {
+    throw new Error(`Question ${num} : il faut au moins 2 choix.`)
+  }
+  if (options.some((c) => typeof c !== 'string' || !c.trim())) {
+    throw new Error(`Question ${num} : chaque choix doit être un texte non vide.`)
+  }
+
+  const correctIndexes = resolveCorrectIndexes(item, options.length, num)
+
+  return {
+    id: `new-${nextQuestionId++}`,
+    texte,
+    points: Number.isFinite(item.points) ? item.points : 5,
+    choix: options.map((libelle, i) => ({ libelle, correct: correctIndexes.includes(i) })),
+  }
+}
+
+// Accepte soit un tableau JSON simple, soit un vrai script Apps Script
+// (var CONFIG = {...}; var QUESTIONS = [...];) — on y repère le titre, la
+// correction, et les questions (options + lettre correcte A/B/C/D…),
+// exactement comme ce script génèrerait un formulaire Google Forms.
 function parseQcmScript(text) {
   let data
   try {
     data = JSON.parse(text)
+    if (!Array.isArray(data)) data = null
   } catch {
-    throw new Error('JSON invalide : vérifiez la syntaxe (virgules, guillemets, crochets).')
+    data = null
+  }
+
+  let config = null
+  if (!data) {
+    data = extractNamedLiteral(text, 'QUESTIONS', '[', ']')
+    config = extractNamedLiteral(text, 'CONFIG', '{', '}')
   }
 
   if (!Array.isArray(data) || data.length === 0) {
-    throw new Error('Le script doit être un tableau de questions (voir le modèle).')
+    throw new Error('Script non reconnu : ni tableau JSON, ni variable QUESTIONS = [...] trouvée.')
   }
 
-  return data.map((item, index) => {
-    const num = index + 1
-    if (!item || typeof item.question !== 'string' || !item.question.trim()) {
-      throw new Error(`Question ${num} : le champ "question" est obligatoire.`)
-    }
-    if (!Array.isArray(item.choix) || item.choix.length < 2) {
-      throw new Error(`Question ${num} : il faut au moins 2 choix.`)
-    }
-    if (item.choix.some((c) => typeof c !== 'string' || !c.trim())) {
-      throw new Error(`Question ${num} : chaque choix doit être un texte non vide.`)
-    }
-    const correctes = Array.isArray(item.correctes) ? item.correctes : []
-    if (correctes.some((i) => !Number.isInteger(i) || i < 0 || i >= item.choix.length)) {
-      throw new Error(`Question ${num} : "correctes" doit contenir des index valides de "choix".`)
-    }
+  const questions = data.map((item, index) => normalizeQuestion(item, index))
 
-    return {
-      id: `new-${nextQuestionId++}`,
-      texte: item.question,
-      points: Number.isFinite(item.points) ? item.points : 5,
-      choix: item.choix.map((libelle, i) => ({ libelle, correct: correctes.includes(i) })),
-    }
-  })
+  return { questions, config }
 }
 
 export default function GestionQCM() {
@@ -98,8 +168,11 @@ export default function GestionQCM() {
 
   const generateFromScript = () => {
     try {
-      const questions = parseQcmScript(scriptText)
-      updateQcm({ questions })
+      const { questions, config } = parseQcmScript(scriptText)
+      const patch = { questions }
+      if (config?.TITRE_FORM) patch.titre = config.TITRE_FORM
+      if (typeof config?.SHOW_CORRECTION === 'boolean') patch.afficher_correction = config.SHOW_CORRECTION
+      updateQcm(patch)
       setScriptModal(false)
     } catch (err) {
       setScriptError(err.message)
@@ -503,7 +576,9 @@ export default function GestionQCM() {
       {scriptModal && (
         <Modal title="Générer depuis un script" onClose={() => setScriptModal(false)} onSubmit={generateFromScript} submitLabel="Générer">
           <p style={{ margin: 0, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.6 }}>
-            Collez un tableau JSON de questions (voir le modèle pré-rempli). "correctes" contient les index (à partir de 0) des choix corrects dans "choix" — une ou plusieurs réponses possibles. Remplace les questions actuelles du QCM.
+            Collez soit un tableau JSON simple (voir le modèle), soit directement votre script Google Apps Script
+            (<code>var CONFIG = {'{'}...{'}'}</code> et <code>var QUESTIONS = [...]</code> avec <code>options</code> et <code>correct: "B"</code>).
+            Le titre et l'option "afficher la correction" sont repris de CONFIG si présents. Remplace les questions actuelles du QCM.
           </p>
           <Field label="Script JSON">
             <textarea
