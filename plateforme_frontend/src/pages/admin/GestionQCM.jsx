@@ -424,8 +424,10 @@ export default function GestionQCM() {
             </select>
           </label>
           <button onClick={copyLink} style={outlineBtnStyle}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
-          <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
-          <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
+          <div style={{ display: 'flex', gap: 10, marginLeft: 24 }}>
+            <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
+            <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
+          </div>
         </div>
       </div>
 
