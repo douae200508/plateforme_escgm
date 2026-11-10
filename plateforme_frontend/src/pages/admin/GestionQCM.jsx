@@ -147,6 +147,10 @@ export default function GestionQCM() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [chapitres, setChapitres] = useState([])
+  const [formations, setFormations] = useState([])
+  const [paramsFormationId, setParamsFormationId] = useState('')
+  const [paramsModules, setParamsModules] = useState([])
+  const [paramsModuleId, setParamsModuleId] = useState('')
   const [qcms, setQcms] = useState([])
   const [qcmId, setQcmId] = useState(null)
   const [qcm, setQcm] = useState(null)
@@ -190,19 +194,77 @@ export default function GestionQCM() {
     setTimeout(() => setLinkCopied(false), 2000)
   }
 
+  // Charge les modules (avec leurs chapitres) d'une formation pour les
+  // menus en cascade de l'onglet Paramètres, et présélectionne le module
+  // du chapitre actuel du QCM si on vient de charger ce QCM.
+  const loadParamsModules = (formationId, currentModuleId) => {
+    api.get('/admin/modules', { params: { formation_id: formationId } }).then(({ data }) => {
+      setParamsModules(data)
+      setParamsModuleId(currentModuleId && data.some((m) => m.id === currentModuleId) ? currentModuleId : (data[0]?.id || ''))
+    })
+  }
+
   const loadQcmDetail = (id) => {
     api
       .get(`/admin/qcms/${id}`)
-      .then(({ data }) => setQcm(data))
+      .then(({ data }) => {
+        setQcm(data)
+        if (data.chapitre) {
+          setParamsFormationId(data.chapitre.formation_id)
+          loadParamsModules(data.chapitre.formation_id, data.chapitre.module_id)
+        } else {
+          setParamsFormationId('')
+          setParamsModules([])
+          setParamsModuleId('')
+        }
+      })
       .catch(() => setError('Impossible de charger ce QCM.'))
+  }
+
+  const onParamsFormationChange = (formationId) => {
+    setParamsFormationId(formationId)
+    api.get('/admin/modules', { params: { formation_id: formationId } }).then(({ data }) => {
+      setParamsModules(data)
+      const firstModule = data[0]
+      setParamsModuleId(firstModule?.id || '')
+      const firstChapitre = firstModule?.chapitres?.[0]
+      if (firstChapitre) {
+        updateQcm({
+          chapitre_id: firstChapitre.id,
+          chapitre: { id: firstChapitre.id, titre: firstChapitre.titre, module_id: firstModule.id, formation_id: formationId },
+        })
+      }
+    })
+  }
+
+  const onParamsModuleChange = (moduleId) => {
+    setParamsModuleId(moduleId)
+    const mod = paramsModules.find((m) => m.id === moduleId)
+    const firstChapitre = mod?.chapitres?.[0]
+    if (firstChapitre) {
+      updateQcm({
+        chapitre_id: firstChapitre.id,
+        chapitre: { id: firstChapitre.id, titre: firstChapitre.titre, module_id: moduleId, formation_id: paramsFormationId },
+      })
+    }
+  }
+
+  const onParamsChapitreChange = (chapitreId) => {
+    const mod = paramsModules.find((m) => m.id === paramsModuleId)
+    const chap = mod?.chapitres?.find((c) => c.id === chapitreId)
+    updateQcm({
+      chapitre_id: chapitreId,
+      chapitre: chap ? { id: chap.id, titre: chap.titre, module_id: paramsModuleId, formation_id: paramsFormationId } : qcm.chapitre,
+    })
   }
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([api.get('/admin/chapitres'), api.get('/admin/qcms')])
-      .then(([chapitresRes, qcmsRes]) => {
+    Promise.all([api.get('/admin/chapitres'), api.get('/admin/qcms'), api.get('/admin/formations')])
+      .then(([chapitresRes, qcmsRes, formationsRes]) => {
         setChapitres(chapitresRes.data)
         setQcms(qcmsRes.data)
+        setFormations(formationsRes.data)
         if (qcmsRes.data.length) {
           setQcmId(qcmsRes.data[0].id)
           loadQcmDetail(qcmsRes.data[0].id)
@@ -276,6 +338,10 @@ export default function GestionQCM() {
       setQcms((prev) => [...prev, { id: data.id, titre: data.titre, chapitre: data.chapitre, questions_count: 0, total_points: 0 }])
       setQcmId(data.id)
       setQcm(data)
+      if (data.chapitre) {
+        setParamsFormationId(data.chapitre.formation_id)
+        loadParamsModules(data.chapitre.formation_id, data.chapitre.module_id)
+      }
       setTab('Questions')
       setNewQcmModal(false)
     } catch {
@@ -507,10 +573,24 @@ export default function GestionQCM() {
           <Field label="Titre du QCM">
             <input type="text" value={qcm.titre} onChange={(e) => updateQcm({ titre: e.target.value })} style={inputStyle} />
           </Field>
+          <Field label="Formation">
+            <select value={paramsFormationId} onChange={(e) => onParamsFormationChange(Number(e.target.value))} style={{ ...inputStyle, background: colors.white }}>
+              {formations.map((f) => (
+                <option key={f.id} value={f.id}>{f.titre}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Module">
+            <select value={paramsModuleId} onChange={(e) => onParamsModuleChange(Number(e.target.value))} style={{ ...inputStyle, background: colors.white }}>
+              {paramsModules.map((m) => (
+                <option key={m.id} value={m.id}>{m.titre}</option>
+              ))}
+            </select>
+          </Field>
           <Field label="Chapitre associé">
-            <select value={qcm.chapitre_id || ''} onChange={(e) => updateQcm({ chapitre_id: Number(e.target.value) })} style={{ ...inputStyle, background: colors.white }}>
-              {chapitres.map((c) => (
-                <option key={c.id} value={c.id}>{chapitreLabel(c)}</option>
+            <select value={qcm.chapitre_id || ''} onChange={(e) => onParamsChapitreChange(Number(e.target.value))} style={{ ...inputStyle, background: colors.white }}>
+              {(paramsModules.find((m) => m.id === paramsModuleId)?.chapitres || []).map((c) => (
+                <option key={c.id} value={c.id}>{c.titre}</option>
               ))}
             </select>
           </Field>

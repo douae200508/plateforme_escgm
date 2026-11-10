@@ -113,14 +113,23 @@ class QcmController extends Controller
     // par question (principe Google Forms).
     private function format(Qcm $qcm)
     {
-        $qcm->load(['ressource.chapitre', 'questions.choix']);
+        $qcm->load(['ressource.chapitre.module', 'questions.choix']);
+
+        $chapitre = $qcm->ressource?->chapitre;
 
         return [
             'id' => $qcm->id,
             'titre' => $qcm->titre,
             'token' => $qcm->token,
             'chapitre_id' => $qcm->ressource?->chapitre_id,
-            'chapitre' => $qcm->ressource?->chapitre,
+            // Formation/module à plat : nécessaire pour présélectionner les
+            // menus en cascade Formation > Module > Chapitre côté front.
+            'chapitre' => $chapitre ? [
+                'id' => $chapitre->id,
+                'titre' => $chapitre->titre,
+                'module_id' => $chapitre->module_id,
+                'formation_id' => $chapitre->module?->formation_id,
+            ] : null,
             'seuil_reussite' => $qcm->seuil_reussite,
             'nombre_tentatives' => $qcm->nombre_tentatives,
             'afficher_correction' => $qcm->afficher_correction,
