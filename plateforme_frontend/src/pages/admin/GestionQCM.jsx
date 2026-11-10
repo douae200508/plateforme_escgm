@@ -163,6 +163,21 @@ export default function GestionQCM() {
   const [scriptModal, setScriptModal] = useState(false)
   const [scriptText, setScriptText] = useState('')
   const [scriptError, setScriptError] = useState('')
+  const [listFormationFilter, setListFormationFilter] = useState('all')
+
+  const onListFormationFilterChange = (value) => {
+    setListFormationFilter(value)
+    api.get('/admin/qcms', { params: value === 'all' ? {} : { formation_id: value } }).then(({ data }) => {
+      setQcms(data)
+      if (data.length) {
+        setQcmId(data[0].id)
+        loadQcmDetail(data[0].id)
+      } else {
+        setQcmId(null)
+        setQcm(null)
+      }
+    })
+  }
 
   const openScriptModal = () => {
     setScriptText(SCRIPT_EXEMPLE)
@@ -390,6 +405,15 @@ export default function GestionQCM() {
     return (
       <div>
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Gestion des QCM</h1>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 700, color: colors.textMuted, marginTop: 14, maxWidth: 260 }}>
+          Formation
+          <select value={listFormationFilter} onChange={(e) => onListFormationFilterChange(e.target.value === 'all' ? 'all' : Number(e.target.value))} style={{ ...inputStyle, background: colors.white }}>
+            <option value="all">Toutes les formations</option>
+            {formations.map((f) => (
+              <option key={f.id} value={f.id}>{f.titre}</option>
+            ))}
+          </select>
+        </label>
         {error && <div style={{ margin: '12px 0', color: colors.danger, fontSize: 14 }}>{error}</div>}
         <div style={{ marginTop: 20, background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 32, textAlign: 'center' }}>
           <p style={{ margin: '0 0 14px', color: colors.textMuted, fontSize: 14 }}>Aucun QCM pour l'instant.</p>
@@ -406,7 +430,7 @@ export default function GestionQCM() {
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginBottom: 6 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 20 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Gestion des QCM</h1>
           <p style={{ margin: '6px 0 0', color: colors.textMuted, fontSize: 14 }}>
@@ -414,22 +438,31 @@ export default function GestionQCM() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 700, color: colors.textMuted }}>
-            QCM
-            <select value={qcmId} onChange={(e) => selectQcm(Number(e.target.value))} style={{ ...inputStyle, minWidth: 220, background: colors.white }}>
-              {qcms.map((q) => (
-                <option key={q.id} value={q.id}>{q.titre}</option>
-              ))}
-            </select>
-          </label>
-          <button onClick={copyLink} style={outlineBtnStyle}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
           <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
         </div>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10, marginBottom: 6 }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 700, color: colors.textMuted }}>
+          Formation
+          <select value={listFormationFilter} onChange={(e) => onListFormationFilterChange(e.target.value === 'all' ? 'all' : Number(e.target.value))} style={{ ...inputStyle, minWidth: 220, background: colors.white }}>
+            <option value="all">Toutes les formations</option>
+            {formations.map((f) => (
+              <option key={f.id} value={f.id}>{f.titre}</option>
+            ))}
+          </select>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 700, color: colors.textMuted }}>
+          QCM
+          <select value={qcmId || ''} onChange={(e) => selectQcm(Number(e.target.value))} style={{ ...inputStyle, minWidth: 220, background: colors.white }}>
+            {qcms.map((q) => (
+              <option key={q.id} value={q.id}>{q.titre}</option>
+            ))}
+          </select>
+        </label>
+        <button onClick={copyLink} style={{ ...outlineBtnStyle, marginLeft: 24 }}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
       </div>
 
       {error && <div style={{ margin: '0 0 12px', color: colors.danger, fontSize: 14 }}>{error}</div>}
