@@ -16,6 +16,63 @@ function chapitreLabel(c) {
   return `${c.formation_titre} · ${c.module_titre} · ${c.titre}`
 }
 
+const SCRIPT_EXEMPLE = JSON.stringify(
+  [
+    {
+      question: 'Quelle est la capitale de la France ?',
+      choix: ['Paris', 'Lyon', 'Marseille'],
+      correctes: [0],
+    },
+    {
+      question: 'Quels langages sont utilisés pour le web ? (plusieurs réponses)',
+      choix: ['HTML', 'CSS', 'Python', 'PHP'],
+      correctes: [0, 1, 3],
+    },
+  ],
+  null,
+  2,
+)
+
+// Valide et convertit le script JSON (question/choix/correctes) vers la
+// forme interne des questions — permet de générer tout un QCM en une
+// fois, comme un script Google Apps Script générant un formulaire.
+function parseQcmScript(text) {
+  let data
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error('JSON invalide : vérifiez la syntaxe (virgules, guillemets, crochets).')
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('Le script doit être un tableau de questions (voir le modèle).')
+  }
+
+  return data.map((item, index) => {
+    const num = index + 1
+    if (!item || typeof item.question !== 'string' || !item.question.trim()) {
+      throw new Error(`Question ${num} : le champ "question" est obligatoire.`)
+    }
+    if (!Array.isArray(item.choix) || item.choix.length < 2) {
+      throw new Error(`Question ${num} : il faut au moins 2 choix.`)
+    }
+    if (item.choix.some((c) => typeof c !== 'string' || !c.trim())) {
+      throw new Error(`Question ${num} : chaque choix doit être un texte non vide.`)
+    }
+    const correctes = Array.isArray(item.correctes) ? item.correctes : []
+    if (correctes.some((i) => !Number.isInteger(i) || i < 0 || i >= item.choix.length)) {
+      throw new Error(`Question ${num} : "correctes" doit contenir des index valides de "choix".`)
+    }
+
+    return {
+      id: `new-${nextQuestionId++}`,
+      texte: item.question,
+      points: Number.isFinite(item.points) ? item.points : 5,
+      choix: item.choix.map((libelle, i) => ({ libelle, correct: correctes.includes(i) })),
+    }
+  })
+}
+
 export default function GestionQCM() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -29,6 +86,25 @@ export default function GestionQCM() {
   const [newQcmForm, setNewQcmForm] = useState({ titre: '', chapitre_id: '' })
   const [toDelete, setToDelete] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [scriptModal, setScriptModal] = useState(false)
+  const [scriptText, setScriptText] = useState('')
+  const [scriptError, setScriptError] = useState('')
+
+  const openScriptModal = () => {
+    setScriptText(SCRIPT_EXEMPLE)
+    setScriptError('')
+    setScriptModal(true)
+  }
+
+  const generateFromScript = () => {
+    try {
+      const questions = parseQcmScript(scriptText)
+      updateQcm({ questions })
+      setScriptModal(false)
+    } catch (err) {
+      setScriptError(err.message)
+    }
+  }
 
   const copyLink = async () => {
     const link = `${window.location.origin}/qcm/${qcm.token}`
@@ -247,6 +323,9 @@ export default function GestionQCM() {
 
       {tab === 'Questions' && (
         <div style={{ background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="button" onClick={openScriptModal} style={outlineBtnStyle}>Générer depuis un script</button>
+          </div>
           {qcm.questions.map((q, qIndex) => (
             <div key={q.id} style={{ paddingBottom: qIndex === qcm.questions.length - 1 ? 0 : 20, borderBottom: qIndex === qcm.questions.length - 1 ? 'none' : `1px solid ${colors.divider}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
@@ -419,6 +498,23 @@ export default function GestionQCM() {
 
       {newQcmModal && (
         <NewQcmModal chapitres={chapitres} form={newQcmForm} setForm={setNewQcmForm} onClose={() => setNewQcmModal(false)} onSubmit={submitNewQcm} />
+      )}
+
+      {scriptModal && (
+        <Modal title="Générer depuis un script" onClose={() => setScriptModal(false)} onSubmit={generateFromScript} submitLabel="Générer">
+          <p style={{ margin: 0, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.6 }}>
+            Collez un tableau JSON de questions (voir le modèle pré-rempli). "correctes" contient les index (à partir de 0) des choix corrects dans "choix" — une ou plusieurs réponses possibles. Remplace les questions actuelles du QCM.
+          </p>
+          <Field label="Script JSON">
+            <textarea
+              value={scriptText}
+              onChange={(e) => setScriptText(e.target.value)}
+              rows={14}
+              style={{ ...inputStyle, minHeight: 'unset', padding: 12, resize: 'vertical', lineHeight: 1.5, fontFamily: 'monospace', fontSize: 12.5 }}
+            />
+          </Field>
+          {scriptError && <p style={{ margin: 0, fontSize: 13, color: colors.danger, fontWeight: 600 }}>{scriptError}</p>}
+        </Modal>
       )}
 
       {toDelete && (
