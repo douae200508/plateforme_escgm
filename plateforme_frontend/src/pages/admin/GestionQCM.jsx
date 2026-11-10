@@ -406,7 +406,7 @@ export default function GestionQCM() {
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 6 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginBottom: 6 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Gestion des QCM</h1>
           <p style={{ margin: '6px 0 0', color: colors.textMuted, fontSize: 14 }}>
@@ -424,10 +424,11 @@ export default function GestionQCM() {
             </select>
           </label>
           <button onClick={copyLink} style={outlineBtnStyle}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
-          <div style={{ display: 'flex', gap: 10, marginLeft: 24 }}>
-            <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
-            <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
-          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
+          <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
+          <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
         </div>
       </div>
 
