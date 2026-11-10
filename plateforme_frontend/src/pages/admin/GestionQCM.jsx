@@ -423,7 +423,7 @@ export default function GestionQCM() {
               ))}
             </select>
           </label>
-          <button onClick={copyLink} style={outlineBtnStyle}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
+          <button onClick={copyLink} style={{ ...outlineBtnStyle, marginLeft: 20 }}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
