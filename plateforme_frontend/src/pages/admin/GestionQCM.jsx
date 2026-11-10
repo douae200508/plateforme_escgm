@@ -656,9 +656,7 @@ export default function GestionQCM() {
       {scriptModal && (
         <Modal title="Générer depuis un script" onClose={() => setScriptModal(false)} onSubmit={generateFromScript} submitLabel="Générer">
           <p style={{ margin: 0, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.6 }}>
-            Collez soit un tableau JSON simple (voir le modèle), soit directement votre script Google Apps Script
-            (<code>var CONFIG = {'{'}...{'}'}</code> et <code>var QUESTIONS = [...]</code> avec <code>options</code> et <code>correct: "B"</code>).
-            Le titre et l'option "afficher la correction" sont repris de CONFIG si présents. Remplace les questions actuelles du QCM.
+            Collez votre script de questions ci-dessous, puis cliquez sur Générer : toutes les questions seront créées automatiquement. Cela remplace les questions actuelles de ce QCM.
           </p>
           <Field label="Script JSON">
             <textarea
