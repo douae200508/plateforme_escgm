@@ -118,6 +118,7 @@ class QcmController extends Controller
         return [
             'id' => $qcm->id,
             'titre' => $qcm->titre,
+            'token' => $qcm->token,
             'chapitre_id' => $qcm->ressource?->chapitre_id,
             'chapitre' => $qcm->ressource?->chapitre,
             'seuil_reussite' => $qcm->seuil_reussite,

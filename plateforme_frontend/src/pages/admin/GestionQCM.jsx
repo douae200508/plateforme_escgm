@@ -28,6 +28,18 @@ export default function GestionQCM() {
   const [newQcmModal, setNewQcmModal] = useState(false)
   const [newQcmForm, setNewQcmForm] = useState({ titre: '', chapitre_id: '' })
   const [toDelete, setToDelete] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  const copyLink = async () => {
+    const link = `${window.location.origin}/qcm/${qcm.token}`
+    try {
+      await navigator.clipboard.writeText(link)
+    } catch {
+      window.prompt('Copiez ce lien :', link)
+    }
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
 
   const loadQcmDetail = (id) => {
     api
@@ -196,6 +208,7 @@ export default function GestionQCM() {
               ))}
             </select>
           </label>
+          <button onClick={copyLink} style={outlineBtnStyle}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
           <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
           <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
         </div>

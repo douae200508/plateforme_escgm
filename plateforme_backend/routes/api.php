@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\ResultatController;
 use App\Http\Controllers\Admin\QcmController;
 use App\Http\Controllers\Admin\GroupeController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\QcmPassageController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -15,6 +16,11 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Lien unique à partager (comme un lien de formulaire Google Forms) :
+    // accessible à tout utilisateur connecté, pas seulement l'admin.
+    Route::get('/qcm/{token}', [QcmPassageController::class, 'show']);
+    Route::post('/qcm/{token}/soumettre', [QcmPassageController::class, 'submit']);
 });
 Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/formations', [FormationController::class, 'index']);

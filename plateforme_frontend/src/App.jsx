@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAdmin } from './auth/RequireAdmin'
+import { RequireAuth } from './auth/RequireAuth'
 import AdminLayout from './layouts/AdminLayout'
 import Login from './pages/auth/Login'
+import QcmPassage from './pages/QcmPassage'
 import Dashboard from './pages/admin/Dashboard'
 import Formations from './pages/admin/Formations'
 import ModulesChapitres from './pages/admin/ModulesChapitres'
@@ -19,6 +21,15 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+
+      <Route
+        path="/qcm/:token"
+        element={
+          <RequireAuth>
+            <QcmPassage />
+          </RequireAuth>
+        }
+      />
 
       <Route
         path="/admin"
