@@ -412,6 +412,10 @@ export default function GestionQCM() {
           <p style={{ margin: '6px 0 0', color: colors.textMuted, fontSize: 14 }}>
             Questions, choix de réponses, bonnes réponses et points.
           </p>
+          <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+            <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
+            <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
@@ -424,8 +428,6 @@ export default function GestionQCM() {
             </select>
           </label>
           <button onClick={copyLink} style={outlineBtnStyle}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
-          <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
-          <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
         </div>
       </div>
 
