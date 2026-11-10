@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\ResultatController;
 use App\Http\Controllers\Admin\QcmController;
 use App\Http\Controllers\Admin\GroupeController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\EvaluationController;
 use App\Http\Controllers\QcmPassageController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -72,6 +73,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::post('/users', [UserController::class, 'store']);
     Route::put('/users/{user}', [UserController::class, 'update']);
     Route::delete('/users/{user}', [UserController::class, 'destroy']);
+
+    Route::get('/evaluations', [EvaluationController::class, 'index']);
+    Route::post('/evaluations', [EvaluationController::class, 'store']);
+    Route::post('/evaluations/{evaluation}/corrige', [EvaluationController::class, 'uploadCorrige']);
+    Route::delete('/evaluations/{evaluation}', [EvaluationController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'role:formateur,admin'])->group(function () {

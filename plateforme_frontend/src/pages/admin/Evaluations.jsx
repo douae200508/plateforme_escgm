@@ -1,34 +1,27 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import api from '../../api/axios'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import Modal, { Field, inputStyle } from '../../components/Modal'
 import { colors } from '../../theme'
 
-// Pur front pour l'instant (pas encore de contrôleur Évaluation côté
-// Laravel) — données d'exemple reprises de la maquette.
-const FORMATIONS = ['Développement Web et Web Mobile', 'Technicien Informatique', 'Gestion de Projet Agile']
+const STORAGE_BASE = api.defaults.baseURL.replace(/\/api\/?$/, '/storage')
 
-const INITIAL_EVALUATIONS = [
-  { id: 1, titre: 'Examen final – Développement Web', deposee: '2026-10-15', formationModule: 'Développement Web et Web Mobile · Module 3', sujet: 'sujet_final_dwwm.pdf', corrige: 'corrige_final_dwwm.pdf' },
-  { id: 2, titre: 'Contrôle – HTML & CSS', deposee: '2026-10-14', formationModule: 'Développement Web et Web Mobile · Module 2', sujet: 'controle_html_css.pdf', corrige: null },
-  { id: 3, titre: 'Examen – Réseaux', deposee: '2026-10-10', formationModule: 'Technicien Informatique · Module 1', sujet: 'examen_reseaux.pdf', corrige: 'corrige_reseaux.pdf' },
-  { id: 4, titre: 'Étude de cas – Scrum', deposee: '2026-10-07', formationModule: 'Gestion de Projet Agile · Module 2', sujet: 'cas_scrum.docx', corrige: null },
-]
-
-const INITIAL_QCM_CORRECTIONS = [
-  { id: 1, titre: 'QCM – Les bases du Web', chapitre: 'Les bases du Web', visible: true },
-  { id: 2, titre: 'QCM – Structure HTML', chapitre: 'Structure HTML', visible: true },
-  { id: 3, titre: 'QCM – Mise en forme CSS', chapitre: 'Conditions et boucles', visible: false },
-]
+function filename(path) {
+  return path ? path.split('/').pop() : null
+}
 
 const TABS = ['Toutes', 'Sans corrigé', 'Corrections des évaluations']
 
-const DEPOT_EMPTY = { titre: '', formation: FORMATIONS[0], module: '' }
-
-let nextId = 100
+const DEPOT_EMPTY = { titre: '', module_id: '' }
 
 export default function Evaluations() {
-  const [evaluations, setEvaluations] = useState(INITIAL_EVALUATIONS)
-  const [qcmCorrections, setQcmCorrections] = useState(INITIAL_QCM_CORRECTIONS)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [formations, setFormations] = useState([])
+  const [formationId, setFormationId] = useState(null)
+  const [modules, setModules] = useState([])
+  const [evaluations, setEvaluations] = useState([])
+  const [qcms, setQcms] = useState([])
   const [tab, setTab] = useState('Toutes')
   const [toDelete, setToDelete] = useState(null)
   const [importTarget, setImportTarget] = useState(null)
@@ -41,44 +34,85 @@ export default function Evaluations() {
   const sujetInputRef = useRef(null)
   const corrigeInputRef = useRef(null)
 
+  const loadForFormation = (fId) => {
+    setLoading(true)
+    Promise.all([
+      api.get('/admin/modules', { params: { formation_id: fId } }),
+      api.get('/admin/evaluations', { params: { formation_id: fId } }),
+      api.get('/admin/qcms', { params: { formation_id: fId } }),
+    ])
+      .then(([modulesRes, evaluationsRes, qcmsRes]) => {
+        setModules(modulesRes.data)
+        setEvaluations(evaluationsRes.data)
+        setQcms(qcmsRes.data)
+      })
+      .catch(() => setError('Impossible de charger les évaluations.'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    api.get('/admin/formations').then(({ data }) => {
+      setFormations(data)
+      if (data.length) setFormationId(data[0].id)
+      else setLoading(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (formationId) loadForFormation(formationId)
+  }, [formationId])
+
   const sansCorrige = evaluations.filter((e) => !e.corrige)
   const visible = tab === 'Sans corrigé' ? sansCorrige : evaluations
 
   const openDepot = () => {
-    setDepotForm(DEPOT_EMPTY)
+    setDepotForm({ titre: '', module_id: modules[0]?.id || '' })
     setDepotSujet(null)
     setDepotCorrige(null)
     setDepotOpen(true)
   }
 
-  const submitDepot = () => {
-    setEvaluations((prev) => [
-      {
-        id: nextId++,
-        titre: depotForm.titre,
-        deposee: new Date().toISOString().slice(0, 10),
-        formationModule: `${depotForm.formation} · ${depotForm.module}`,
-        sujet: depotSujet?.name || '—',
-        corrige: depotCorrige?.name || null,
-      },
-      ...prev,
-    ])
-    setDepotOpen(false)
+  const submitDepot = async () => {
+    try {
+      const body = new FormData()
+      body.append('titre', depotForm.titre)
+      body.append('module_id', depotForm.module_id)
+      if (depotSujet) body.append('sujet', depotSujet)
+      if (depotCorrige) body.append('corrige', depotCorrige)
+      const { data } = await api.post('/admin/evaluations', body, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setEvaluations((prev) => [data, ...prev])
+      setDepotOpen(false)
+    } catch {
+      setError("Le dépôt de l'évaluation a échoué.")
+    }
   }
 
-  const submitImport = () => {
-    setEvaluations((prev) => prev.map((e) => (e.id === importTarget.id ? { ...e, corrige: importFile?.name || e.corrige } : e)))
-    setImportTarget(null)
-    setImportFile(null)
+  const submitImport = async () => {
+    try {
+      const body = new FormData()
+      body.append('corrige', importFile)
+      const { data } = await api.post(`/admin/evaluations/${importTarget.id}/corrige`, body, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setEvaluations((prev) => prev.map((e) => (e.id === data.id ? data : e)))
+      setImportTarget(null)
+      setImportFile(null)
+    } catch {
+      setError("L'import du corrigé a échoué.")
+    }
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
+    await api.delete(`/admin/evaluations/${toDelete.id}`)
     setEvaluations((prev) => prev.filter((e) => e.id !== toDelete.id))
     setToDelete(null)
   }
 
-  const toggleQcmCorrection = (id) => {
-    setQcmCorrections((prev) => prev.map((q) => (q.id === id ? { ...q, visible: !q.visible } : q)))
+  const toggleQcmCorrection = async (q) => {
+    const { data } = await api.put(`/admin/qcms/${q.id}`, { afficher_correction: !q.afficher_correction })
+    setQcms((prev) => prev.map((x) => (x.id === q.id ? { ...x, afficher_correction: data.afficher_correction } : x)))
+  }
+
+  if (loading) {
+    return <p style={{ color: colors.textMuted, fontSize: 14 }}>Chargement…</p>
   }
 
   return (
@@ -90,7 +124,19 @@ export default function Evaluations() {
             Sujets de fin de module et corrigés, et publication des corrections de QCM.
           </p>
         </div>
-        <button onClick={openDepot} style={primaryBtnStyle}>+ Déposer une évaluation</button>
+        <button onClick={openDepot} style={primaryBtnStyle} disabled={!modules.length}>+ Déposer une évaluation</button>
+      </div>
+
+      {error && <div style={{ margin: '0 0 16px', color: colors.danger, fontSize: 14 }}>{error}</div>}
+
+      <div style={{ marginBottom: 16 }}>
+        <Field label="Formation">
+          <select value={formationId || ''} onChange={(e) => setFormationId(Number(e.target.value))} style={{ ...inputStyle, minWidth: 280, background: colors.white }}>
+            {formations.map((f) => (
+              <option key={f.id} value={f.id}>{f.titre}</option>
+            ))}
+          </select>
+        </Field>
       </div>
 
       <div style={{ display: 'flex', gap: 22, borderBottom: `1px solid ${colors.border}`, marginBottom: 16 }}>
@@ -124,7 +170,7 @@ export default function Evaluations() {
             <thead>
               <tr style={{ textAlign: 'left', background: colors.tableHead, color: colors.textMuted, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Évaluation</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Formation / Module</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Module</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Sujet</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Corrigé</th>
                 <th style={{ padding: '12px 16px' }}></th>
@@ -135,12 +181,24 @@ export default function Evaluations() {
                 <tr key={e.id} style={{ borderTop: `1px solid ${colors.divider}` }}>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ fontWeight: 700 }}>{e.titre}</div>
-                    <div style={{ fontSize: 12, color: colors.textMuted }}>Déposée le {new Date(e.deposee).toLocaleDateString('fr-FR')}</div>
+                    <div style={{ fontSize: 12, color: colors.textMuted }}>Déposée le {new Date(e.created_at).toLocaleDateString('fr-FR')}</div>
                   </td>
-                  <td style={{ padding: '12px 16px', color: colors.primary, fontWeight: 600 }}>{e.formationModule}</td>
-                  <td style={{ padding: '12px 16px', color: colors.primary, fontWeight: 600 }}>{e.sujet}</td>
+                  <td style={{ padding: '12px 16px', color: colors.primary, fontWeight: 600 }}>{e.module?.titre}</td>
                   <td style={{ padding: '12px 16px' }}>
-                    {e.corrige ? <Pill tone="green">{e.corrige}</Pill> : <Pill tone="amber">Manquant</Pill>}
+                    {e.sujet && (
+                      <button type="button" onClick={() => window.open(`${STORAGE_BASE}/${e.sujet}`, '_blank')} style={linkBtnStyle}>
+                        {filename(e.sujet)}
+                      </button>
+                    )}
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    {e.corrige ? (
+                      <button type="button" onClick={() => window.open(`${STORAGE_BASE}/${e.corrige}`, '_blank')} style={{ border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>
+                        <Pill tone="green">{filename(e.corrige)}</Pill>
+                      </button>
+                    ) : (
+                      <Pill tone="amber">Manquant</Pill>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
@@ -160,7 +218,7 @@ export default function Evaluations() {
         </div>
       ) : (
         <div style={{ background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 16 }}>
-          {qcmCorrections.map((q, i) => (
+          {qcms.map((q, i) => (
             <div
               key={q.id}
               style={{
@@ -175,16 +233,19 @@ export default function Evaluations() {
             >
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{q.titre}</div>
-                <div style={{ fontSize: 12.5, color: colors.primary, fontWeight: 600 }}>Chapitre : {q.chapitre}</div>
+                {q.chapitre && <div style={{ fontSize: 12.5, color: colors.primary, fontWeight: 600 }}>Chapitre : {q.chapitre.titre}</div>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: q.visible ? colors.primary : colors.textMuted }}>
-                  {q.visible ? 'Correction visible' : 'Correction masquée'}
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: q.afficher_correction ? colors.primary : colors.textMuted }}>
+                  {q.afficher_correction ? 'Correction visible' : 'Correction masquée'}
                 </span>
-                <Toggle checked={q.visible} onChange={() => toggleQcmCorrection(q.id)} />
+                <Toggle checked={q.afficher_correction} onChange={() => toggleQcmCorrection(q)} />
               </div>
             </div>
           ))}
+          {qcms.length === 0 && (
+            <div style={{ padding: 20, color: colors.textMuted, fontSize: 14 }}>Aucun QCM pour cette formation.</div>
+          )}
         </div>
       )}
 
@@ -208,19 +269,16 @@ export default function Evaluations() {
           <Field label="Titre de l'évaluation">
             <input type="text" required autoFocus value={depotForm.titre} onChange={(e) => setDepotForm({ ...depotForm, titre: e.target.value })} style={inputStyle} />
           </Field>
-          <Field label="Formation">
-            <select value={depotForm.formation} onChange={(e) => setDepotForm({ ...depotForm, formation: e.target.value })} style={{ ...inputStyle, background: colors.white }}>
-              {FORMATIONS.map((f) => (
-                <option key={f} value={f}>{f}</option>
+          <Field label="Module">
+            <select value={depotForm.module_id} onChange={(e) => setDepotForm({ ...depotForm, module_id: Number(e.target.value) })} style={{ ...inputStyle, background: colors.white }}>
+              {modules.map((m) => (
+                <option key={m.id} value={m.id}>{m.titre}</option>
               ))}
             </select>
           </Field>
-          <Field label="Module">
-            <input type="text" value={depotForm.module} onChange={(e) => setDepotForm({ ...depotForm, module: e.target.value })} placeholder="Ex. Module 2 : HTML & CSS" style={inputStyle} />
-          </Field>
           <Field label="Sujet">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input ref={sujetInputRef} type="file" style={{ display: 'none' }} onChange={(e) => setDepotSujet(e.target.files?.[0] || null)} />
+              <input ref={sujetInputRef} type="file" required style={{ display: 'none' }} onChange={(e) => setDepotSujet(e.target.files?.[0] || null)} />
               <button type="button" onClick={() => sujetInputRef.current?.click()} style={chooseFileBtnStyle}>Choisir un fichier</button>
               <span style={{ fontSize: 13, color: colors.textMuted }}>{depotSujet ? depotSujet.name : "Aucun fichier n'a été sélectionné"}</span>
             </div>
@@ -295,6 +353,17 @@ function SmallButton({ onClick, variant = 'default', children }) {
       {children}
     </button>
   )
+}
+
+const linkBtnStyle = {
+  border: 0,
+  background: 'transparent',
+  color: colors.primary,
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: 'pointer',
+  padding: 0,
+  textAlign: 'left',
 }
 
 const chooseFileBtnStyle = {

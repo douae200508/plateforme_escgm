@@ -9,9 +9,12 @@ use Illuminate\Support\Str;
 
 class QcmController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $request->validate(['formation_id' => 'nullable|exists:formations,id']);
+
         $qcms = Qcm::with('ressource.chapitre:id,titre', 'questions:id,qcm_id,points')
+            ->when($request->formation_id, fn ($q) => $q->whereHas('ressource.chapitre.module', fn ($mq) => $mq->where('formation_id', $request->formation_id)))
             ->get()
             ->map(fn ($q) => [
                 'id' => $q->id,
@@ -19,6 +22,7 @@ class QcmController extends Controller
                 'chapitre' => $q->ressource?->chapitre,
                 'questions_count' => $q->questions->count(),
                 'total_points' => $q->questions->sum('points'),
+                'afficher_correction' => $q->afficher_correction,
             ]);
 
         return response()->json($qcms);
