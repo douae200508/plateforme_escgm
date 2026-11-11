@@ -1,6 +1,9 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import { RequireAdmin } from './auth/RequireAdmin'
 import { RequireAuth } from './auth/RequireAuth'
+import { RedirigerVersEspace } from './auth/RedirigerVersEspace'
+import { stagiaireRoutes } from './routes/StagiaireRoutes'
+import { formateurRoutes } from './routes/FormateurRoutes'
 import AdminLayout from './layouts/AdminLayout'
 import Login from './pages/auth/Login'
 import QcmPassage from './pages/QcmPassage'
@@ -55,7 +58,11 @@ function App() {
         <Route path="parametres" element={<Parametres />} />
       </Route>
 
-      <Route path="/" element={<Navigate to="/admin" replace />} />
+      {formateurRoutes}
+      {stagiaireRoutes}
+
+      <Route path="/" element={<RedirigerVersEspace />} />
+      <Route path="*" element={<RedirigerVersEspace />} />
     </Routes>
   )
 }

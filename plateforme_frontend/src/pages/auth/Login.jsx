@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../auth/AuthContext'
+import { espaceDe } from '../../auth/roles'
 import { colors } from '../../theme'
 
 const FEATURES = [
@@ -62,7 +63,7 @@ export default function Login() {
       login(data.user, data.token)
       const destination = location.state?.from
         ? `${location.state.from.pathname}${location.state.from.search || ''}`
-        : (data.user.role === 'admin' ? '/admin' : '/')
+        : espaceDe(data.user)
       navigate(destination, { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || 'Identifiants incorrects.')
