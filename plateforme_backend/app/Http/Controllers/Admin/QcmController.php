@@ -9,9 +9,12 @@ use Illuminate\Support\Str;
 
 class QcmController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $request->validate(['formation_id' => 'nullable|exists:formations,id']);
+
         $qcms = Qcm::with('ressource.chapitre:id,titre', 'questions:id,qcm_id,points')
+            ->when($request->formation_id, fn ($q) => $q->whereHas('ressource.chapitre.module', fn ($mq) => $mq->where('formation_id', $request->formation_id)))
             ->get()
             ->map(fn ($q) => [
                 'id' => $q->id,
@@ -19,6 +22,7 @@ class QcmController extends Controller
                 'chapitre' => $q->ressource?->chapitre,
                 'questions_count' => $q->questions->count(),
                 'total_points' => $q->questions->sum('points'),
+                'afficher_correction' => $q->afficher_correction,
             ]);
 
         return response()->json($qcms);
@@ -66,9 +70,9 @@ class QcmController extends Controller
             'questions' => 'sometimes|array',
             'questions.*.texte' => 'required_with:questions|string',
             'questions.*.points' => 'required_with:questions|numeric|min:0',
-            'questions.*.correct_index' => 'required_with:questions|integer|min:0',
-            'questions.*.choix' => 'required_with:questions|array|min:1',
-            'questions.*.choix.*' => 'string',
+            'questions.*.choix' => 'required_with:questions|array|min:2',
+            'questions.*.choix.*.libelle' => 'required_with:questions|string',
+            'questions.*.choix.*.correct' => 'sometimes|boolean',
         ]);
 
         $qcm->update(collect($data)->only(['titre', 'seuil_reussite', 'nombre_tentatives', 'afficher_correction'])->toArray());
@@ -87,10 +91,10 @@ class QcmController extends Controller
                     'ordre' => $index,
                 ]);
 
-                foreach ($q['choix'] as $cIndex => $libelle) {
+                foreach ($q['choix'] as $choix) {
                     $question->choix()->create([
-                        'libelle' => $libelle,
-                        'est_correct' => $cIndex === $q['correct_index'],
+                        'libelle' => $choix['libelle'],
+                        'est_correct' => $choix['correct'] ?? false,
                     ]);
                 }
             }
@@ -108,17 +112,28 @@ class QcmController extends Controller
     }
 
     // Traduit le modèle relationnel (questions -> choix avec est_correct)
-    // vers la forme simple attendue par le front (choix: string[] +
-    // correct_index), qui ne gère qu'une seule bonne réponse par question.
+    // vers la forme attendue par le front : chaque choix porte son propre
+    // indicateur "correct", ce qui permet 0, 1 ou plusieurs bonnes réponses
+    // par question (principe Google Forms).
     private function format(Qcm $qcm)
     {
-        $qcm->load(['ressource.chapitre', 'questions.choix']);
+        $qcm->load(['ressource.chapitre.module', 'questions.choix']);
+
+        $chapitre = $qcm->ressource?->chapitre;
 
         return [
             'id' => $qcm->id,
             'titre' => $qcm->titre,
+            'token' => $qcm->token,
             'chapitre_id' => $qcm->ressource?->chapitre_id,
-            'chapitre' => $qcm->ressource?->chapitre,
+            // Formation/module à plat : nécessaire pour présélectionner les
+            // menus en cascade Formation > Module > Chapitre côté front.
+            'chapitre' => $chapitre ? [
+                'id' => $chapitre->id,
+                'titre' => $chapitre->titre,
+                'module_id' => $chapitre->module_id,
+                'formation_id' => $chapitre->module?->formation_id,
+            ] : null,
             'seuil_reussite' => $qcm->seuil_reussite,
             'nombre_tentatives' => $qcm->nombre_tentatives,
             'afficher_correction' => $qcm->afficher_correction,
@@ -126,8 +141,7 @@ class QcmController extends Controller
                 'id' => $q->id,
                 'texte' => $q->enonce,
                 'points' => $q->points,
-                'correct_index' => $q->choix->search(fn ($c) => $c->est_correct) ?: 0,
-                'choix' => $q->choix->pluck('libelle')->values(),
+                'choix' => $q->choix->map(fn ($c) => ['libelle' => $c->libelle, 'correct' => $c->est_correct])->values(),
             ])->values(),
         ];
     }

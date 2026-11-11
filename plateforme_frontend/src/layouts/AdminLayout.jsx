@@ -10,7 +10,8 @@ export default function AdminLayout() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        height: '100vh',
+        overflow: 'hidden',
         background: colors.bg,
         fontFamily: "'Inter', system-ui, sans-serif",
         color: colors.text,
@@ -23,6 +24,8 @@ export default function AdminLayout() {
         style={{
           flex: '1 1 220px',
           maxWidth: 240,
+          height: '100%',
+          overflowY: 'auto',
           background: colors.sidebar,
           color: colors.white,
           padding: '22px 12px',
@@ -95,9 +98,10 @@ export default function AdminLayout() {
         </div>
       </nav>
 
-      <div style={{ flex: '999 1 640px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: '999 1 640px', minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <header
           style={{
+            flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
             gap: 20,
@@ -170,7 +174,7 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main style={{ padding: '24px 30px 48px', boxSizing: 'border-box' }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: '24px 30px 48px', boxSizing: 'border-box' }}>
           <Outlet />
         </main>
       </div>

@@ -1,117 +1,112 @@
-import { useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import api from '../../api/axios'
 import Badge from '../../components/Badge'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import Modal, { Field, inputStyle } from '../../components/Modal'
 import { colors } from '../../theme'
 
-// Pur front pour l'instant (pas encore de contrôleur Utilisateur côté
-// Laravel) — données d'exemple reprises de la maquette.
-const GROUPES = ['DWWM 2026', 'TIP 2026', 'CIP 2026']
-const ROLES = ['Administrateur', 'Formateur', 'Stagiaire']
-
+const ROLE_LABELS = { admin: 'Administrateur', formateur: 'Formateur', stagiaire: 'Stagiaire' }
 const ROLE_STYLE = {
-  Administrateur: { bg: colors.primaryLight, color: colors.primary },
-  Formateur: { bg: colors.cardGreenBg, color: colors.success },
-  Stagiaire: { bg: colors.cardOrangeBg, color: colors.brandAmber },
+  admin: { bg: colors.primaryLight, color: colors.primary },
+  formateur: { bg: colors.cardGreenBg, color: colors.success },
+  stagiaire: { bg: colors.cardOrangeBg, color: colors.brandAmber },
 }
-
-const INITIAL_USERS = [
-  { id: 1, prenom: 'Admin', nom: 'ESCGM', email: 'admin@escgm.fr', role: 'Administrateur', groupe: null, statut: 'Actif' },
-  { id: 2, prenom: 'Sophie', nom: 'Martin', email: 'sophie@escgm.fr', role: 'Formateur', groupe: 'DWWM 2026', statut: 'Actif' },
-  { id: 3, prenom: 'Karim', nom: 'Ali', email: 'karim.ali@escgm.fr', role: 'Formateur', groupe: 'TIP 2026', statut: 'Actif' },
-  { id: 4, prenom: 'Mariam', nom: 'Abdallah', email: 'mariam.abdallah@escgm.fr', role: 'Formateur', groupe: 'CIP 2026', statut: 'Actif' },
-  { id: 5, prenom: 'Thomas', nom: 'Leroy', email: 'thomas.leroy@escgm.fr', role: 'Formateur', groupe: null, statut: 'Suspendu' },
-  { id: 6, prenom: 'Yassine', nom: 'Benali', email: 'yassine.benali@escgm.fr', role: 'Stagiaire', groupe: 'DWWM 2026', statut: 'Actif' },
-  { id: 7, prenom: 'Fatima', nom: 'Ahmed', email: 'fatima.ahmed@escgm.fr', role: 'Stagiaire', groupe: 'DWWM 2026', statut: 'Actif' },
-  { id: 8, prenom: 'Kamal', nom: 'Abdou', email: 'kamal.abdou@escgm.fr', role: 'Stagiaire', groupe: 'DWWM 2026', statut: 'Actif' },
-  { id: 9, prenom: 'Naïma', nom: 'Youssouf', email: 'naima.youssouf@escgm.fr', role: 'Stagiaire', groupe: 'DWWM 2026', statut: 'Actif' },
-  { id: 10, prenom: 'Hakim', nom: 'Saïd', email: 'hakim.said@escgm.fr', role: 'Stagiaire', groupe: 'TIP 2026', statut: 'Actif' },
-  { id: 11, prenom: 'Amina', nom: 'Said', email: 'amina.said@escgm.fr', role: 'Stagiaire', groupe: 'TIP 2026', statut: 'Suspendu' },
-  { id: 12, prenom: 'Nadia', nom: 'Combo', email: 'nadia.combo@escgm.fr', role: 'Stagiaire', groupe: 'CIP 2026', statut: 'Actif' },
-  { id: 13, prenom: 'Saïd', nom: 'Abdillah', email: 'said.abdillah@escgm.fr', role: 'Stagiaire', groupe: 'CIP 2026', statut: 'Actif' },
-]
 
 const TABS = [
   { id: 'Tous', label: 'Tous' },
-  { id: 'Administrateur', label: 'Administrateurs' },
-  { id: 'Formateur', label: 'Formateurs' },
-  { id: 'Stagiaire', label: 'Stagiaires' },
+  { id: 'admin', label: 'Administrateurs' },
+  { id: 'formateur', label: 'Formateurs' },
+  { id: 'stagiaire', label: 'Stagiaires' },
   { id: 'Suspendus', label: 'Suspendus' },
 ]
 
-const EMPTY_FORM = { prenom: '', nom: '', email: '', role: 'Stagiaire', groupe: GROUPES[0] }
-
-let nextId = 100
+const EMPTY_FORM = { prenom: '', nom: '', email: '', role: 'stagiaire', groupe_id: '' }
 
 export default function Utilisateurs() {
-  const [users, setUsers] = useState(INITIAL_USERS)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [users, setUsers] = useState([])
+  const [groupes, setGroupes] = useState([])
   const [tab, setTab] = useState('Tous')
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState(null) // { mode: 'create' | 'edit', id? }
   const [form, setForm] = useState(EMPTY_FORM)
   const [toDelete, setToDelete] = useState(null)
-  const [importOpen, setImportOpen] = useState(false)
-  const [importFile, setImportFile] = useState(null)
-  const importInputRef = useRef(null)
+  const [generatedPassword, setGeneratedPassword] = useState(null)
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([api.get('/admin/users'), api.get('/admin/groupes')])
+      .then(([usersRes, groupesRes]) => {
+        setUsers(usersRes.data)
+        setGroupes(groupesRes.data)
+      })
+      .catch(() => setError('Impossible de charger les utilisateurs.'))
+      .finally(() => setLoading(false))
+  }, [])
 
   const counts = {
     Tous: users.length,
-    Administrateur: users.filter((u) => u.role === 'Administrateur').length,
-    Formateur: users.filter((u) => u.role === 'Formateur').length,
-    Stagiaire: users.filter((u) => u.role === 'Stagiaire').length,
-    Suspendus: users.filter((u) => u.statut === 'Suspendu').length,
+    admin: users.filter((u) => u.role === 'admin').length,
+    formateur: users.filter((u) => u.role === 'formateur').length,
+    stagiaire: users.filter((u) => u.role === 'stagiaire').length,
+    Suspendus: users.filter((u) => !u.actif).length,
   }
 
   const visible = users.filter((u) => {
-    const matchesTab = tab === 'Tous' ? true : tab === 'Suspendus' ? u.statut === 'Suspendu' : u.role === tab
+    const matchesTab = tab === 'Tous' ? true : tab === 'Suspendus' ? !u.actif : u.role === tab
     const q = search.toLowerCase()
     const matchesSearch = `${u.prenom} ${u.nom}`.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
     return matchesTab && matchesSearch
   })
 
   const openCreate = () => {
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, groupe_id: groupes[0]?.id || '' })
     setModal({ mode: 'create' })
   }
 
   const openEdit = (u) => {
-    setForm({ prenom: u.prenom, nom: u.nom, email: u.email, role: u.role, groupe: u.groupe || GROUPES[0] })
+    setForm({ prenom: u.prenom, nom: u.nom, email: u.email, role: u.role, groupe_id: u.groupe_id || groupes[0]?.id || '' })
     setModal({ mode: 'edit', id: u.id })
   }
 
   const closeModal = () => setModal(null)
 
-  const submitModal = () => {
-    const groupe = form.role === 'Administrateur' ? null : form.groupe
-    if (modal.mode === 'create') {
-      setUsers((prev) => [...prev, { id: nextId++, ...form, groupe, statut: 'Actif' }])
-    } else {
-      setUsers((prev) => prev.map((u) => (u.id === modal.id ? { ...u, ...form, groupe } : u)))
+  const submitModal = async () => {
+    const groupe_id = form.role === 'admin' ? null : (form.groupe_id || null)
+    try {
+      if (modal.mode === 'create') {
+        const { data } = await api.post('/admin/users', { nom: form.nom, prenom: form.prenom, email: form.email, role: form.role, groupe_id })
+        setUsers((prev) => [...prev, data.user])
+        setGeneratedPassword({ nom: `${data.user.prenom} ${data.user.nom}`, mot_de_passe: data.mot_de_passe_genere })
+      } else {
+        const { data } = await api.put(`/admin/users/${modal.id}`, { nom: form.nom, prenom: form.prenom, email: form.email, role: form.role, groupe_id })
+        setUsers((prev) => prev.map((u) => (u.id === data.id ? data : u)))
+      }
+      closeModal()
+    } catch {
+      setError("L'enregistrement de l'utilisateur a échoué.")
     }
-    closeModal()
   }
 
-  const toggleStatut = (u) => {
-    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, statut: x.statut === 'Actif' ? 'Suspendu' : 'Actif' } : x)))
+  const toggleStatut = async (u) => {
+    const { data } = await api.put(`/admin/users/${u.id}`, { actif: !u.actif })
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? data : x)))
   }
 
-  const confirmDelete = () => {
-    setUsers((prev) => prev.filter((u) => u.id !== toDelete.id))
-    setToDelete(null)
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/admin/users/${toDelete.id}`)
+      setUsers((prev) => prev.filter((u) => u.id !== toDelete.id))
+      setToDelete(null)
+    } catch {
+      setError("La suppression a échoué (vous ne pouvez pas supprimer votre propre compte).")
+      setToDelete(null)
+    }
   }
 
-  const submitImport = () => {
-    // Démonstration front : en l'absence de lecture réelle du fichier
-    // (ça viendra avec le backend), on ajoute trois comptes fictifs pour
-    // montrer le résultat d'un import.
-    const demo = [
-      { prenom: 'Issa', nom: 'Moussa', email: 'issa.moussa@escgm.fr', role: 'Stagiaire', groupe: GROUPES[0] },
-      { prenom: 'Zaïna', nom: 'Hamada', email: 'zaina.hamada@escgm.fr', role: 'Stagiaire', groupe: GROUPES[0] },
-      { prenom: 'Rachid', nom: 'Soidiki', email: 'rachid.soidiki@escgm.fr', role: 'Formateur', groupe: GROUPES[1] },
-    ].map((u) => ({ id: nextId++, ...u, statut: 'Actif' }))
-    setUsers((prev) => [...prev, ...demo])
-    setImportOpen(false)
-    setImportFile(null)
+  if (loading) {
+    return <p style={{ color: colors.textMuted, fontSize: 14 }}>Chargement…</p>
   }
 
   return (
@@ -123,11 +118,10 @@ export default function Utilisateurs() {
             Comptes, rôles, groupes, activation et suspension.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => setImportOpen(true)} style={outlineBtnStyle}>Importer un fichier</button>
-          <button onClick={openCreate} style={primaryBtnStyle}>+ Ajouter un utilisateur</button>
-        </div>
+        <button onClick={openCreate} style={primaryBtnStyle}>+ Ajouter un utilisateur</button>
       </div>
+
+      {error && <div style={{ margin: '0 0 16px', color: colors.danger, fontSize: 14 }}>{error}</div>}
 
       <div
         style={{
@@ -185,7 +179,7 @@ export default function Utilisateurs() {
           </thead>
           <tbody>
             {visible.map((u) => {
-              const suspended = u.statut === 'Suspendu'
+              const suspended = !u.actif
               const roleStyle = ROLE_STYLE[u.role]
               return (
                 <tr key={u.id} style={{ borderTop: `1px solid ${colors.divider}` }}>
@@ -214,10 +208,10 @@ export default function Utilisateurs() {
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '12px 16px' }}>{u.role}</td>
-                  <td style={{ padding: '12px 16px', color: u.groupe ? colors.text : colors.textMuted }}>{u.groupe || '—'}</td>
+                  <td style={{ padding: '12px 16px' }}>{ROLE_LABELS[u.role]}</td>
+                  <td style={{ padding: '12px 16px', color: u.groupe ? colors.text : colors.textMuted }}>{u.groupe?.nom || '—'}</td>
                   <td style={{ padding: '12px 16px' }}>
-                    <Badge status={u.statut} />
+                    <Badge status={suspended ? 'Suspendu' : 'Actif'} />
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
@@ -258,16 +252,17 @@ export default function Utilisateurs() {
           </Field>
           <Field label="Rôle">
             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} style={{ ...inputStyle, background: colors.white }}>
-              {ROLES.map((r) => (
-                <option key={r} value={r}>{r}</option>
+              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
               ))}
             </select>
           </Field>
-          {form.role !== 'Administrateur' && (
+          {form.role !== 'admin' && (
             <Field label="Groupe">
-              <select value={form.groupe} onChange={(e) => setForm({ ...form, groupe: e.target.value })} style={{ ...inputStyle, background: colors.white }}>
-                {GROUPES.map((g) => (
-                  <option key={g} value={g}>{g}</option>
+              <select value={form.groupe_id} onChange={(e) => setForm({ ...form, groupe_id: Number(e.target.value) })} style={{ ...inputStyle, background: colors.white }}>
+                <option value="">Aucun groupe</option>
+                {groupes.map((g) => (
+                  <option key={g.id} value={g.id}>{g.nom}</option>
                 ))}
               </select>
             </Field>
@@ -275,28 +270,13 @@ export default function Utilisateurs() {
         </Modal>
       )}
 
-      {importOpen && (
-        <Modal title="Importer des comptes" onClose={() => setImportOpen(false)} onSubmit={submitImport} submitLabel="Importer">
-          <Field label="Fichier CSV ou Excel">
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                border: `1.5px dashed ${colors.border}`,
-                borderRadius: 10,
-                padding: 12,
-              }}
-            >
-              <input ref={importInputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
-              <button type="button" onClick={() => importInputRef.current?.click()} style={chooseFileBtnStyle}>Choisir un fichier</button>
-              <span style={{ fontSize: 13, color: colors.textMuted }}>{importFile ? importFile.name : "Aucun fichier n'a été sélectionné"}</span>
-            </div>
-          </Field>
-          <p style={{ margin: 0, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.6 }}>
-            Colonnes attendues : nom, adresse électronique, rôle, groupe.
-            <br />
-            Démonstration : trois comptes fictifs seront ajoutés.
+      {generatedPassword && (
+        <Modal title="Compte créé" onClose={() => setGeneratedPassword(null)} onSubmit={() => setGeneratedPassword(null)} submitLabel="Fermer">
+          <p style={{ margin: '0 0 10px', fontSize: 13.5 }}>
+            Mot de passe temporaire pour <strong>{generatedPassword.nom}</strong> (à communiquer, il n'est affiché qu'une seule fois) :
+          </p>
+          <p style={{ margin: 0, padding: 12, background: colors.primaryLight, borderRadius: 10, fontFamily: 'monospace', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>
+            {generatedPassword.mot_de_passe}
           </p>
         </Modal>
       )}
@@ -326,30 +306,6 @@ function SmallButton({ onClick, variant = 'default', children }) {
       {children}
     </button>
   )
-}
-
-const chooseFileBtnStyle = {
-  minHeight: 38,
-  padding: '0 14px',
-  border: `1px solid ${colors.border}`,
-  borderRadius: 8,
-  background: colors.white,
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-}
-
-const outlineBtnStyle = {
-  minHeight: 42,
-  padding: '0 16px',
-  border: `1px solid ${colors.border}`,
-  borderRadius: 10,
-  background: colors.white,
-  color: colors.text,
-  fontWeight: 700,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
 }
 
 const primaryBtnStyle = {

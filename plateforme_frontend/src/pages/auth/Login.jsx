@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../auth/AuthContext'
 import { colors } from '../../theme'
@@ -51,6 +51,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -59,7 +60,10 @@ export default function Login() {
     try {
       const { data } = await api.post('/login', { email: identifiant, password })
       login(data.user, data.token)
-      navigate(data.user.role === 'admin' ? '/admin' : '/')
+      const destination = location.state?.from
+        ? `${location.state.from.pathname}${location.state.from.search || ''}`
+        : (data.user.role === 'admin' ? '/admin' : '/')
+      navigate(destination, { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || 'Identifiants incorrects.')
     } finally {

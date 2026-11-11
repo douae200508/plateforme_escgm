@@ -6,6 +6,10 @@ use App\Http\Controllers\Admin\ChapitreController;
 use App\Http\Controllers\Admin\RessourceController;
 use App\Http\Controllers\Admin\ResultatController;
 use App\Http\Controllers\Admin\QcmController;
+use App\Http\Controllers\Admin\GroupeController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\EvaluationController;
+use App\Http\Controllers\QcmPassageController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -13,6 +17,11 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Lien unique à partager (comme un lien de formulaire Google Forms) :
+    // accessible à tout utilisateur connecté, pas seulement l'admin.
+    Route::get('/qcm/{token}', [QcmPassageController::class, 'show']);
+    Route::post('/qcm/{token}/soumettre', [QcmPassageController::class, 'submit']);
 });
 Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/formations', [FormationController::class, 'index']);
@@ -49,6 +58,26 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::get('/qcms/{qcm}', [QcmController::class, 'show']);
     Route::put('/qcms/{qcm}', [QcmController::class, 'update']);
     Route::delete('/qcms/{qcm}', [QcmController::class, 'destroy']);
+
+    Route::get('/groupes', [GroupeController::class, 'index']);
+    Route::post('/groupes', [GroupeController::class, 'store']);
+    Route::get('/groupes/{groupe}', [GroupeController::class, 'show']);
+    Route::put('/groupes/{groupe}', [GroupeController::class, 'update']);
+    Route::delete('/groupes/{groupe}', [GroupeController::class, 'destroy']);
+    Route::post('/groupes/{groupe}/formateurs', [GroupeController::class, 'assignFormateur']);
+    Route::delete('/groupes/{groupe}/formateurs/{user}', [GroupeController::class, 'removeFormateur']);
+    Route::post('/groupes/{groupe}/stagiaires', [GroupeController::class, 'assignStagiaire']);
+    Route::delete('/groupes/{groupe}/stagiaires/{user}', [GroupeController::class, 'removeStagiaire']);
+
+    Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::put('/users/{user}', [UserController::class, 'update']);
+    Route::delete('/users/{user}', [UserController::class, 'destroy']);
+
+    Route::get('/evaluations', [EvaluationController::class, 'index']);
+    Route::post('/evaluations', [EvaluationController::class, 'store']);
+    Route::post('/evaluations/{evaluation}/corrige', [EvaluationController::class, 'uploadCorrige']);
+    Route::delete('/evaluations/{evaluation}', [EvaluationController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'role:formateur,admin'])->group(function () {
