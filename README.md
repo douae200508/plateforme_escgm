@@ -39,11 +39,11 @@ Le site vitrine existant reste en place : un bouton « Espace pédagogique » su
 - Gérer les paramètres de la plateforme
 
 ### Espace formateur
-- Consulter ses formations et les groupes qui lui sont affectés
+- Consulter la formation et le groupe qui lui sont affectés
 - Consulter les cours et leurs ressources, télécharger une ressource
 - Utiliser le mode présentation pendant une séance
 - Consulter les corrections (QCM, TP, évaluations)
-- **Publier la correction d'un QCM ou d'un TP pour un de ses groupes**
+- **Publier la correction d'un TP pour son groupe**
 - Suivre la progression et les résultats de ses stagiaires
 - Échanger des messages avec ses stagiaires
 - Envoyer un signalement à l'administrateur
@@ -51,8 +51,8 @@ Le site vitrine existant reste en place : un bouton « Espace pédagogique » su
 ### Espace stagiaire
 - Consulter ses formations, les cours et leurs ressources
 - Télécharger une ressource et les sujets de TP (le TP est rendu au formateur **en dehors de la plateforme**)
-- Passer un QCM (note calculée automatiquement)
-- Consulter la correction d'un QCM ou d'un TP **une fois publiée par son formateur**
+- Passer un QCM : note calculée automatiquement et correction affichée dès l'envoi des réponses
+- Consulter la correction d'un TP **une fois publiée par son formateur**
 - Consulter ses notes et sa progression
 - Échanger des messages avec ses formateurs
 
@@ -64,13 +64,13 @@ Le site vitrine existant reste en place : un bouton « Espace pédagogique » su
 - **Seul l'administrateur ajoute du contenu** (cours, vidéos, documents, QCM, TP, évaluations et leurs corrections).
 - Les stagiaires ne voient que le contenu **publié** de la formation de **leur groupe**.
 - Un stagiaire appartient à **un seul groupe** ; un groupe suit **une formation**.
-- Un formateur est affecté à **un ou plusieurs groupes** ; un groupe peut avoir plusieurs formateurs.
+- Un formateur est affecté à **un seul groupe**.
 
 ### Corrections
 
 | Correction | Administrateur | Formateur | Stagiaire |
 |---|---|---|---|
-| QCM | ✅ | ✅ | ✅ **seulement si son formateur l'a publiée pour son groupe** |
+| QCM | ✅ | ✅ | ✅ **immédiatement après avoir envoyé ses réponses** |
 | TP | ✅ | ✅ | ✅ **seulement si son formateur l'a publiée pour son groupe** |
 | Évaluation | ✅ | ✅ | ❌ jamais |
 
@@ -94,8 +94,9 @@ Ces règles sont appliquées **côté API**, pas uniquement dans l'interface : u
 ## Conception
 
 > **Évolutions décidées après la version 4 des diagrammes** (à intégrer dans leur prochaine version) :
-> - les corrections des QCM et des TP deviennent visibles aux stagiaires lorsque le formateur les publie ;
-> - nouvelle association **Formateur ↔ Groupe** (« enseigne ») ;
+> - la correction d'un QCM est visible par le stagiaire dès qu'il a envoyé ses réponses ;
+> - la correction d'un TP devient visible aux stagiaires lorsque leur formateur la publie ;
+> - nouvelle association **Formateur ↔ Groupe** (« enseigne ») : un formateur encadre un groupe ;
 > - nouvelle classe **PublicationCorrection** (correction publiée pour un groupe, par un formateur, à une date).
 
 ### Diagramme de cas d'utilisation
