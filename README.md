@@ -39,34 +39,64 @@ Le site vitrine existant reste en place : un bouton « Espace pédagogique » su
 - Gérer les paramètres de la plateforme
 
 ### Espace formateur
-- Consulter ses formations et ses groupes
+- Consulter ses formations et les groupes qui lui sont affectés
 - Consulter les cours et leurs ressources, télécharger une ressource
 - Utiliser le mode présentation pendant une séance
-- Consulter les corrections (QCM, TP, évaluations), en lecture seule
-- Suivre les résultats de ses groupes
+- Consulter les corrections (QCM, TP, évaluations)
+- **Publier la correction d'un QCM ou d'un TP pour un de ses groupes**
+- Suivre la progression et les résultats de ses stagiaires
+- Échanger des messages avec ses stagiaires
 - Envoyer un signalement à l'administrateur
 
 ### Espace stagiaire
 - Consulter ses formations, les cours et leurs ressources
-- Télécharger une ressource
-- Passer un QCM (note calculée automatiquement, sans affichage de la correction)
-- Consulter ses notes
+- Télécharger une ressource et les sujets de TP (le TP est rendu au formateur **en dehors de la plateforme**)
+- Passer un QCM (note calculée automatiquement)
+- Consulter la correction d'un QCM ou d'un TP **une fois publiée par son formateur**
+- Consulter ses notes et sa progression
+- Échanger des messages avec ses formateurs
 
 ---
 
 ## Règles de gestion
 
-- **Seul l'administrateur ajoute du contenu** (cours, vidéos, QCM, TP, évaluations et corrections).
-- **Les corrections sont visibles par l'administrateur et les formateurs, jamais par les stagiaires.** Cette règle est appliquée côté API, pas uniquement dans l'interface.
-- Les stagiaires ne voient que le contenu **publié**.
-- **Messages** : échange libre entre tous les utilisateurs.
+### Contenu
+- **Seul l'administrateur ajoute du contenu** (cours, vidéos, documents, QCM, TP, évaluations et leurs corrections).
+- Les stagiaires ne voient que le contenu **publié** de la formation de **leur groupe**.
+- Un stagiaire appartient à **un seul groupe** ; un groupe suit **une formation**.
+- Un formateur est affecté à **un ou plusieurs groupes** ; un groupe peut avoir plusieurs formateurs.
+
+### Corrections
+
+| Correction | Administrateur | Formateur | Stagiaire |
+|---|---|---|---|
+| QCM | ✅ | ✅ | ✅ **seulement si son formateur l'a publiée pour son groupe** |
+| TP | ✅ | ✅ | ✅ **seulement si son formateur l'a publiée pour son groupe** |
+| Évaluation | ✅ | ✅ | ❌ jamais |
+
+Ces règles sont appliquées **côté API**, pas uniquement dans l'interface : une correction non publiée n'est jamais envoyée au navigateur d'un stagiaire.
+
+### QCM et progression
+- Le QCM est construit dans la plateforme (questions + choix) ; la note est calculée automatiquement.
+- L'administrateur fixe le **seuil de réussite** et le **nombre de tentatives** ; on conserve la **meilleure note**.
+- Un chapitre est **terminé** quand son QCM est réussi (note ≥ seuil). Un chapitre sans QCM est terminé dès qu'il a été consulté.
+
+### TP
+- Le stagiaire télécharge le sujet, réalise le TP et le rend à son formateur **en dehors de la plateforme**. Il n'y a pas de dépôt de fichiers par les stagiaires.
+
+### Messages, notifications et signalements
+- **Messages** : un stagiaire écrit à ses formateurs et à l'administrateur ; formateurs et administrateur peuvent écrire à tout le monde. Pas de messagerie entre stagiaires.
+- **Notification** : créée automatiquement à chaque nouveau message (ou réponse) et à chaque signalement ; elle apparaît sur la cloche jusqu'à ce qu'elle soit lue.
 - **Signalement** : émis par un formateur, traité par l'administrateur (statut : `nouveau` / `traité`, avec une réponse).
-- **Notification** : créée automatiquement à chaque nouveau message ou signalement.
-- **QCM** : construit dans la plateforme (questions + choix) ; un jeton (`token`) permet de partager le lien.
 
 ---
 
 ## Conception
+
+> **Évolutions décidées après la version 4 des diagrammes** (à intégrer dans leur prochaine version) :
+> - les corrections des QCM et des TP deviennent visibles aux stagiaires lorsque le formateur les publie ;
+> - nouvelle association **Formateur ↔ Groupe** (« enseigne ») ;
+> - nouvelle classe **PublicationCorrection** (correction publiée pour un groupe, par un formateur, à une date).
 
 ### Diagramme de cas d'utilisation
 
