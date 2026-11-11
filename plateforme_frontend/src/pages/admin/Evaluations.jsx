@@ -117,27 +117,27 @@ export default function Evaluations() {
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginBottom: 16 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Gestion des évaluations</h1>
-          <p style={{ margin: '6px 0 0', color: colors.textMuted, fontSize: 14 }}>
-            Sujets de fin de module et corrigés, et publication des corrections de QCM.
-          </p>
-        </div>
-        <button onClick={openDepot} style={primaryBtnStyle} disabled={!modules.length}>+ Déposer une évaluation</button>
+      <div style={{ marginBottom: 14 }}>
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Gestion des évaluations</h1>
+        <p style={{ margin: '6px 0 0', color: colors.textMuted, fontSize: 14 }}>
+          Sujets de fin de module et corrigés, et publication des corrections de QCM.
+        </p>
       </div>
 
-      {error && <div style={{ margin: '0 0 16px', color: colors.danger, fontSize: 14 }}>{error}</div>}
-
-      <div style={{ marginBottom: 16 }}>
-        <Field label="Formation">
-          <select value={formationId || ''} onChange={(e) => setFormationId(Number(e.target.value))} style={{ ...inputStyle, minWidth: 280, background: colors.white }}>
+      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'flex-start', alignItems: 'flex-end', gap: 12, marginBottom: 16, overflowX: 'auto' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 700, color: colors.textMuted, minWidth: 0 }}>
+          Formation
+          <select value={formationId || ''} onChange={(e) => setFormationId(Number(e.target.value))} style={{ ...inputStyle, width: 220, minWidth: 0, background: colors.white }}>
             {formations.map((f) => (
               <option key={f.id} value={f.id}>{f.titre}</option>
             ))}
           </select>
-        </Field>
+        </label>
+
+        <button onClick={openDepot} style={{ ...primaryBtnStyle, whiteSpace: 'nowrap', marginLeft: 'auto', flexShrink: 0 }} disabled={!modules.length}>+ Déposer une évaluation</button>
       </div>
+
+      {error && <div style={{ margin: '0 0 16px', color: colors.danger, fontSize: 14 }}>{error}</div>}
 
       <div style={{ display: 'flex', gap: 22, borderBottom: `1px solid ${colors.border}`, marginBottom: 16 }}>
         {TABS.map((t) => {

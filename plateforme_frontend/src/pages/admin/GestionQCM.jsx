@@ -406,29 +406,29 @@ export default function GestionQCM() {
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginBottom: 6 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Gestion des QCM</h1>
-          <p style={{ margin: '6px 0 0', color: colors.textMuted, fontSize: 14 }}>
-            Questions, choix de réponses, bonnes réponses et points.
-          </p>
-        </div>
+      <div style={{ marginBottom: 14 }}>
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Gestion des QCM</h1>
+        <p style={{ margin: '6px 0 0', color: colors.textMuted, fontSize: 14 }}>
+          Questions, choix de réponses, bonnes réponses et points.
+        </p>
+      </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 700, color: colors.textMuted }}>
+      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'flex-start', alignItems: 'flex-end', gap: 12, marginBottom: 6, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexShrink: 1, minWidth: 0 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 700, color: colors.textMuted, minWidth: 0 }}>
             QCM
-            <select value={qcmId || ''} onChange={(e) => selectQcm(Number(e.target.value))} style={{ ...inputStyle, minWidth: 220, background: colors.white }}>
+            <select value={qcmId || ''} onChange={(e) => selectQcm(Number(e.target.value))} style={{ ...inputStyle, width: 180, minWidth: 0, background: colors.white }}>
               {qcms.map((q) => (
                 <option key={q.id} value={q.id}>{q.titre}</option>
               ))}
             </select>
           </label>
-          <button onClick={copyLink} style={{ ...outlineBtnStyle, marginLeft: 20 }}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
+          <button onClick={copyLink} style={{ ...outlineBtnStyle, whiteSpace: 'nowrap', flexShrink: 0 }}>{linkCopied ? 'Lien copié ✓' : 'Copier le lien'}</button>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-          <button onClick={openNewQcmModal} style={outlineBtnStyle}>+ Nouveau QCM</button>
-          <button onClick={save} style={primaryBtnStyle}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
+        <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
+          <button onClick={openNewQcmModal} style={{ ...outlineBtnStyle, whiteSpace: 'nowrap' }}>+ Nouveau QCM</button>
+          <button onClick={save} style={{ ...primaryBtnStyle, whiteSpace: 'nowrap' }}>{saved ? 'Enregistré ✓' : 'Enregistrer'}</button>
         </div>
       </div>
 
